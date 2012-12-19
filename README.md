@@ -44,9 +44,9 @@ To get the first result of a query:
 
     queryParam := UserByIdQuery{UserId: 1}
     user := User{}
-	  err := dapper.First(db, "select * from users where id=:UserId", queryParam, &user)
-	  if err != nil {
-		    // ...
+    err := dapper.First(db, "select * from users where id=:UserId", queryParam, &user)
+    if err != nil {
+    	// ...
     }
 
 To perform a query:
