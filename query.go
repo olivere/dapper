@@ -255,36 +255,48 @@ func (j *joinClause) SubSql() string {
 // Where clauses
 
 type whereClause struct {
-	query   *query
-	nodes   []whereNode
+	q     *query
+	nodes []whereNode
 }
 
 func NewWhereClause(query *query) *whereClause {
 	wc := &whereClause{
-		query: query,
+		q: query,
 		nodes: make([]whereNode, 0),
 	}
 	return wc
 }
 
 func (wc *whereClause) Eq(column string, value interface{}) *whereClause {
-	we := whereEqual{wc.query, column, value}
+	we := whereEqual{wc.q, column, value}
 	wc.nodes = append(wc.nodes, we)
 	return wc
 }
 
 func (wc *whereClause) Ne(column string, value interface{}) *whereClause {
-	wne := whereNotEqual{wc.query, column, value}
+	wne := whereNotEqual{wc.q, column, value}
 	wc.nodes = append(wc.nodes, wne)
 	return wc
 }
 
+func (wc *whereClause) Take(take int) *query {
+	return wc.q.Take(take)
+}
+
+func (wc *whereClause) Skip(take int) *query {
+	return wc.q.Skip(take)
+}
+
+func (wc *whereClause) Order() *orderClause {
+	return wc.q.Order()
+}
+
 func (wc *whereClause) Sql() string {
-	return wc.query.Sql()
+	return wc.q.Sql()
 }
 
 func (wc *whereClause) Project(column string) *query {
-	return wc.query.Project(column)
+	return wc.q.Project(column)
 }
 
 func (wc *whereClause) SubSql() string {
@@ -307,13 +319,13 @@ type whereNode interface {
 // A where clause of type "column = value"
 
 type whereEqual struct {
-	query   *query
+	q       *query
 	column  string
 	value   interface{}
 }
 
 func (we whereEqual) Sql() string {
-	return we.query.Sql()
+	return we.q.Sql()
 }
 
 func (we whereEqual) SubSql() string {
@@ -326,13 +338,13 @@ func (we whereEqual) SubSql() string {
 // A where clause of type "column != value"
 
 type whereNotEqual struct {
-	query   *query
+	q       *query
 	column  string
 	value   interface{}
 }
 
 func (wne whereNotEqual) Sql() string {
-	return wne.query.Sql()
+	return wne.q.Sql()
 }
 
 func (wne whereNotEqual) SubSql() string {
