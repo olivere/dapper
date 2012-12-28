@@ -106,11 +106,11 @@ CREATE TABLE tweets (
 	}
 
 	// Insert seed data
-	_, err = db.Exec("INSERT INTO users (id,name) VALUES (1, 'Oliver')")
+	_, err = db.Exec("INSERT INTO users (id,name,karma,suspended) VALUES (1, 'Oliver', 42.13, 0)")
 	if err != nil {
 		t.Fatalf("error inserting user: %v", err)
 	}
-	_, err = db.Exec("INSERT INTO users (id,name) VALUES (2, 'Sandra')")
+	_, err = db.Exec("INSERT INTO users (id,name,karma,suspended) VALUES (2, 'Sandra', 57.19, 1)")
 	if err != nil {
 		t.Fatalf("error inserting user: %v", err)
 	}
@@ -231,8 +231,10 @@ func TestFirst(t *testing.T) {
 	if out.Name != "Oliver" {
 		t.Errorf("expected user.Name == %s, got %s", "Oliver", out.Name)
 	}
-	if out.Karma != nil {
-		t.Errorf("expected user.Karma == nil, got %v", out.Karma)
+	if out.Karma == nil {
+		t.Errorf("expected user.Karma != nil, got %v", out.Karma)
+	} else if *out.Karma != 42.13 {
+		t.Errorf("expected user.Karma == %v, got %v", 42.13, *out.Karma)
 	}
 	if out.Suspended {
 		t.Errorf("expected user.Suspended == %v, got %v", false, out.Suspended)
@@ -282,6 +284,12 @@ func TestQuery(t *testing.T) {
 		if user.Id <= 0 {
 			t.Errorf("expected user to have an Id > 0, got %d", user.Id)
 		}
+		if user.Name == "" {
+			t.Errorf("expected user to have Name != \"\", got %v", user.Name)
+		}
+		if user.Karma == nil {
+			t.Errorf("expected user to have Karma != nil, got %v", user.Karma)
+		}
 	}
 }
 
@@ -303,6 +311,14 @@ func TestQueryWithProjections(t *testing.T) {
 		}
 		if user.Id <= 0 {
 			t.Errorf("expected user to have an Id > 0, got %d", user.Id)
+		}
+		// Column expected to be != ""
+		if user.Name == "" {
+			t.Errorf("expected user to have Name != \"\", got %v", user.Name)
+		}
+		// Karma is not in the projection, so it should have its default value
+		if user.Karma != nil {
+			t.Errorf("expected user to have Karma == nil, got %v", user.Karma)
 		}
 	}
 }

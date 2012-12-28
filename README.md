@@ -11,11 +11,41 @@ implement your own simple object mapper), here it is.
 
 This is still a work in progress. Use at your own risk.
 
-## Usage
+## Installation
 
 Install via `go get github.com/olivere/dapper`.
 
-Specify queries and entities:
+## Concepts
+
+Dapper has two concepts: Generating SQL statements (limited to MySQL)
+and running SQL statements and returning results in Go structs.
+
+## SQL generation
+
+Maybe you're like me and want your program to generate a SQL statement
+based on some conditions. While you can build SQL manually, that's rather
+cumbersome.
+
+I'd rather do something like this:
+
+    sql := dapper.Q("users").Alias("u").
+        Join("tweets").Alias("t").On("u.id", "t.user_id").
+        Project("u.name", "t.message").
+        Order().Asc("u.name").
+        Order().Desc("t.created").
+        Take(10).
+        Sql()
+
+    => SELECT u.name,t.message 
+         FROM users u 
+         JOIN tweets t ON u.id=t.user_id
+        ORDER BY u.name ASC,t.created DESC
+        LIMIT 10
+
+## Querying
+
+First, specify the "entities" and apply tags to let Dapper find
+a mapping between the struct field and the database column:
 
     type User struct {
         Id        int64      `dapper:"id,primarykey,autoincrement"`
@@ -26,39 +56,83 @@ Specify queries and entities:
         Ignored   string     `dapper:"-"`
     }
 
+Of course, you need to connect to a database and get yourself a `*sql.DB`:
+
+    db, err := sql.Open(...)
+
+Now you can throw some SQL at Dapper and let it fill your result set:
+
+    // Build SQL statement
+    sql := dapper.Q("users").Alias("u").
+        Join("tweets").Alias("t").On("u.id", "t.user_id").
+        Project("u.name", "t.message").
+        Order().Asc("u.name").
+        Order().Desc("t.created").
+        Take(10).
+        Sql()
+
+    // Run the query
+    results, err := dapper.Query(db, sql, nil, reflect.TypeOf(User{}))
+    if err != nil {
+        // ...
+    }
+
+    // Iterate
+    for _, result := range results {
+        // Cast to User
+        user, ok := result.(*User)
+        if !ok { ... }
+        fmt.Println(user.Name)
+    }
+
+But there's a second way of executing SQL queries. You can use with a 
+struct that serves as a binding to the query. Here's how:
+
+    // A binding with a UserId field in it
     type UserByIdQuery struct {
         UserId    int64
     }
 
+    // Another binding with some more fields
     type UserbyComplexQuery struct {
         MinKarma  float64
         MaxKarma  float64
         Country   string
     }
 
-In Go, connect to a database and get yourself a `*sql.DB`:
-
-    db, err := sql.Open(...)
-
 To get the first result of a query:
 
-    queryParam := UserByIdQuery{UserId: 1}
+    // Create a User for storing the result
     user := User{}
+
+    // Fill the binding for the query: UserId=1
+    queryParam := UserByIdQuery{UserId: 1}
+
+    // Now run the query:
+    // Notice the ":UserId" will be retrieved from the binding, so the
+    // SQL statement is: "select * from users where id=1"
     err := dapper.First(db, "select * from users where id=:UserId", queryParam, &user)
     if err != nil {
     	// ...
     }
 
-To perform a query:
+To perform a query returning not a single entity but a slice:
 
+    // Another binding
     queryParam := UsersByComplexQuery{MinKarma: 17.0, Country: "DE"}
+
+    // Results
+    // The reflect.TypeOf(...) is ugly, I know.
     results, err := dapper.Query("select * from users "+
         "where karma > :MinKarma and country = :Country "+
         "order by name limit 30", queryParam, reflect.TypeOf(User{}))
     if err != nil {
         // ...
     }
+
+    // Iterate
     for _, result := range results {
+        // Cast to User
         user, ok := result.(*User)
         if !ok { ... }
         fmt.Println(user.Name)

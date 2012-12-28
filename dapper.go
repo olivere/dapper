@@ -61,16 +61,6 @@ func First(db *sql.DB, sql string, param interface{}, dst interface{}) error {
 		return err
 	}
 
-	// Prepare destination fields for Scan
-	/*
-	dstFields := make([]interface{}, len(dstInfo.ColumnNames))
-	for i, colName := range dstInfo.ColumnNames {
-		fi, _ := dstInfo.ColumnInfos[colName]
-		field := dstValue.Elem().FieldByName(fi.FieldName)
-		dstFields[i] = field.Addr().Interface()
-	}
-	*/
-
 	// Scan fills all fields in dst here
 	if rows.Next() {
 		dstFields := make([]interface{}, 0)
@@ -100,13 +90,6 @@ func First(db *sql.DB, sql string, param interface{}, dst interface{}) error {
 	return nil
 }
 
-/*
-// Same as First, but executed in a transaction.
-func FirstTx(tx *sql.Tx, sql string, param interface{}, dst interface{}) error {
-	return nil
-}
-*/
-
 // Returns a list of results of a specified SQL query in dst.
 // Parameters in sql start with a colon and will be substituted by the
 // corresponding field in the param object. If there are no substitutions,
@@ -114,8 +97,7 @@ func FirstTx(tx *sql.Tx, sql string, param interface{}, dst interface{}) error {
 //
 // Example:
 // param := UserByCompanyQuery{CompanyId: 42}
-// results := make([]User, 0)
-// err := dapper.First(db, "select * from users where company_id=:CompanyId oder by email limit 10", param, &results)
+// results, err := dapper.Query(db, "select * from users where company_id=:CompanyId oder by email limit 10", param, reflect.TypeOf(User{}))
 func Query(db *sql.DB, sql string, param interface{}, gotype reflect.Type) ([]interface{}, error) {
 	dstInfo, err := AddType(gotype)
 	if err != nil {
@@ -152,14 +134,6 @@ func Query(db *sql.DB, sql string, param interface{}, gotype reflect.Type) ([]in
 	for rows.Next() {
 		// Prepare destination fields for Scan
 		singleResult := reflect.New(gotype)
-		/*
-		dstFields := make([]interface{}, len(dstInfo.ColumnNames))
-		for i, colName := range dstInfo.ColumnNames {
-			fi, _ := dstInfo.ColumnInfos[colName]
-			field := singleResult.Elem().FieldByName(fi.FieldName)
-			dstFields[i] = field.Addr().Interface()
-		}
-		*/
 
 		dstFields := make([]interface{}, 0)
 		dbColumnNames, err := rows.Columns()
@@ -191,13 +165,6 @@ func Query(db *sql.DB, sql string, param interface{}, gotype reflect.Type) ([]in
 
 	return results, nil
 }
-
-/*
-// Same as Query, but executed in a transaction.
-func QueryTx(tx *sql.Tx, sql string, param interface{}, dst interface{}) error {
-	return nil
-}
-*/
 
 /*
 // Executes a SQL statement (insert, update, delete) and returns its result.
