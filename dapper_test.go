@@ -241,6 +241,21 @@ func TestFirst(t *testing.T) {
 	}
 }
 
+func TestFirstWithoutDataReturnsErrNoRows(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+	
+	in := user{Id: 42}
+	out := user{}
+	err := First(db, "select * from users where id=:Id", in, &out)
+	if err == nil {
+		t.Fatalf("expected an error, got %v", err)
+	}
+	if err != sql.ErrNoRows {
+		t.Errorf("expected error %v, got %v", sql.ErrNoRows, err)
+	}
+}
+
 func TestFirstWithProjection(t *testing.T) {
 	db := setup(t)
 	defer db.Close()

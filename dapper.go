@@ -12,12 +12,15 @@ import (
 // Parameters in sql start with a colon and will be substituted by the
 // corresponding field in the param object. If there are no substitutions,
 // pass nil as param.
+//
+// Notice that sql.ErrNoRows is returned (just as with sql.QueryRow) when
+// there is no row found.
 // 
 // Example:
 // param := UserByIdQuery{Id: 42}
 // result := User{}
 // err := dapper.First(db, "select * from users where id=:Id", param, &result)
-func First(db *sql.DB, sql string, param interface{}, dst interface{}) error {
+func First(db *sql.DB, sqlQuery string, param interface{}, dst interface{}) error {
 	// Get information about dst
 	dstValue := reflect.ValueOf(dst)
 	if dstValue.IsNil() {
@@ -51,12 +54,12 @@ func First(db *sql.DB, sql string, param interface{}, dst interface{}) error {
 			// TODO check for nil and invalid field
 			value := field.Interface()
 			quoted := Quote(value)
-			sql = strings.Replace(sql, ":"+paramName, quoted, -1)
+			sqlQuery = strings.Replace(sqlQuery, ":"+paramName, quoted, -1)
 		}
 	}
 
 	// We use Query instead of QueryRow, because row does not contain Column information
-	rows, err := db.Query(sql)
+	rows, err := db.Query(sqlQuery)
 	if err != nil {
 		return err
 	}
@@ -85,6 +88,9 @@ func First(db *sql.DB, sql string, param interface{}, dst interface{}) error {
 		if err != nil {
 			return err
 		}
+	} else {
+		// If there's no row, we should return sql.ErrNoRows
+		return sql.ErrNoRows
 	}
 
 	return nil
