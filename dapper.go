@@ -8,6 +8,10 @@ import (
 	"strings"
 )
 
+var (
+	ErrWrongType = errors.New("dapper: wrong type")
+)
+
 // Returns the first result of the specified SQL query in dst.
 // Parameters in sql start with a colon and will be substituted by the
 // corresponding field in the param object. If there are no substitutions,
@@ -192,3 +196,61 @@ func ExecTx(tx *sql.Tx, sql string, param interface{}) (*sql.Result, error) {
 	return nil, nil
 }
 */
+
+// Runs the query and returns the value of the first column of the first
+// row. This is useful for queries such as counting.
+// 
+// Parameters in sql start with a colon and will be substituted by the
+// corresponding field in the param object. If there are no substitutions,
+// pass nil as param.
+//
+// Notice that sql.ErrNoRows is returned (just as with sql.QueryRow) when
+// there is no row found.
+// 
+// Example:
+// param := UserByIdQuery{Id: 42}
+// count, err := dapper.Scalar(db, "select count(*) from users where id=:Id", param)
+func Scalar(db *sql.DB, sqlQuery string, param interface{}) (interface{}, error) {
+	// Get information about param
+	if param != nil {
+		paramValue := reflect.ValueOf(param)
+		paramInfo, err := AddType(paramValue.Type())
+		if err != nil {
+			return nil, err
+		}
+
+		// Substitute parameters in SQL statement
+		for paramName, _ := range paramInfo.FieldInfos {
+			// Get value of field in param
+			field := paramValue.FieldByName(paramName)
+			// TODO check for nil and invalid field
+			value := field.Interface()
+			quoted := Quote(value)
+			sqlQuery = strings.Replace(sqlQuery, ":"+paramName, quoted, -1)
+		}
+	}
+
+	row := db.QueryRow(sqlQuery)
+
+	var dst interface{}
+	err := row.Scan(&dst)
+	if err != nil {
+		return nil, err
+	}
+
+	return dst, nil
+}
+
+// Count is a helper function that runs Scalar and interprets
+// the result as int64. If the result is not an int64, it returns
+// ErrWrongType.
+func Count(db *sql.DB, sqlQuery string, param interface{}) (int64, error) {
+	scalar, err := Scalar(db, sqlQuery, param)
+	if err != nil {
+		return 0, err
+	}
+	if count, ok := scalar.(int64); ok {
+		return count, nil
+	}
+	return 0, ErrWrongType
+}

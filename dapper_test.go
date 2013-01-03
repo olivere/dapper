@@ -337,3 +337,43 @@ func TestQueryWithProjections(t *testing.T) {
 		}
 	}
 }
+
+func TestScalar(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	result, err := Scalar(db, "select count(*) from users order by name", nil)
+	if err != nil {
+		t.Fatalf("error on Query: %v", err)
+	}
+	count, ok := result.(int64)
+	if !ok {
+		t.Fatalf("expeced scalar to return an int64, got %v", result)
+	}
+	if count != 2 {
+		t.Errorf("expected count of users == %d, got %d", 2, count)
+	}
+}
+
+func TestCount(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	count, err := Count(db, "select count(*) from users order by name", nil)
+	if err != nil {
+		t.Fatalf("error on Query: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("expected count of users == %d, got %d", 2, count)
+	}
+}
+
+func TestCountWithWrongType(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	_, err := Count(db, "select name from users order by name limit 1", nil)
+	if err != ErrWrongType {
+		t.Fatalf("expected ErrWrongType as error, got %v", err)
+	}
+}
