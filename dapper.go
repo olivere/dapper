@@ -3,7 +3,6 @@ package dapper
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"reflect"
 	"strings"
 )
@@ -69,6 +68,7 @@ func First(db *sql.DB, sqlQuery string, param interface{}, dst interface{}) erro
 	}
 
 	// Scan fills all fields in dst here
+	var placeholder interface{}
 	if rows.Next() {
 		dstFields := make([]interface{}, 0)
 		dbColumnNames, err := rows.Columns()
@@ -77,14 +77,18 @@ func First(db *sql.DB, sqlQuery string, param interface{}, dst interface{}) erro
 		}
 		for _, dbColName := range dbColumnNames {
 			fi, found := dstInfo.ColumnInfos[dbColName]
-			if !found {
+			if found {
+				field := dstValue.Elem().FieldByName(fi.FieldName)
+				dstFields = append(dstFields, field.Addr().Interface())
+			} else {
+				// Ignore missing columns
+				dstFields = append(dstFields, &placeholder)
+				/*
 				return errors.New(
 					fmt.Sprintf("type %s: found no corresponding mapping "+
 						"for column %s in result", gotype, dbColName))
+				*/
 			}
-
-			field := dstValue.Elem().FieldByName(fi.FieldName)
-			dstFields = append(dstFields, field.Addr().Interface())
 		}
 
 		// Scan results
@@ -141,6 +145,7 @@ func Query(db *sql.DB, sql string, param interface{}, gotype reflect.Type) ([]in
 	// Results
 	results := make([]interface{}, 0)
 
+	var placeholder interface{}
 	for rows.Next() {
 		// Prepare destination fields for Scan
 		singleResult := reflect.New(gotype)
@@ -152,14 +157,18 @@ func Query(db *sql.DB, sql string, param interface{}, gotype reflect.Type) ([]in
 		}
 		for _, dbColName := range dbColumnNames {
 			fi, found := dstInfo.ColumnInfos[dbColName]
-			if !found {
+			if found {
+				field := singleResult.Elem().FieldByName(fi.FieldName)
+				dstFields = append(dstFields, field.Addr().Interface())
+			} else {
+				// Ignore missing columns
+				dstFields = append(dstFields, &placeholder)
+				/*
 				return nil, errors.New(
 					fmt.Sprintf("type %s: found no corresponding mapping "+
 						"for column %s in result", gotype, dbColName))
+				//*/
 			}
-
-			field := singleResult.Elem().FieldByName(fi.FieldName)
-			dstFields = append(dstFields, field.Addr().Interface())
 		}
 
 

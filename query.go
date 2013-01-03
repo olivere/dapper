@@ -304,6 +304,10 @@ func (wc *whereClause) NotIn(column string, values ...interface{}) *whereClause 
 	return wc
 }
 
+func (wc *whereClause) Project(columns ...string) *query {
+	return wc.q.Project(columns...)
+}
+
 func (wc *whereClause) Take(take int) *query {
 	return wc.q.Take(take)
 }
@@ -318,10 +322,6 @@ func (wc *whereClause) Order() *orderClause {
 
 func (wc *whereClause) Sql() string {
 	return wc.q.Sql()
-}
-
-func (wc *whereClause) Project(column string) *query {
-	return wc.q.Project(column)
 }
 
 func (wc *whereClause) SubSql() string {

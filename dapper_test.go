@@ -55,6 +55,11 @@ type user struct {
 	Suspended bool     `dapper:"suspended"`
 }
 
+type userWithMissingColumns struct {
+	Id        int64    `dapper:"id,primarykey,serial"`
+	Name      string   `dapper:"name"`
+}
+
 func (u *user) String() string {
 	return fmt.Sprintf("user[Id=%v,Name=%v,Karma=%v,Suspended=%v]",
 		u.Id, u.Name, u.Karma, u.Suspended)
@@ -334,6 +339,32 @@ func TestQueryWithProjections(t *testing.T) {
 		// Karma is not in the projection, so it should have its default value
 		if user.Karma != nil {
 			t.Errorf("expected user to have Karma == nil, got %v", user.Karma)
+		}
+	}
+}
+
+func TestQueryIgnoresMissingColumns(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	results, err := Query(db, "select * from users order by name", nil, reflect.TypeOf(userWithMissingColumns{}))
+	if err != nil {
+		t.Fatalf("error on Query: %v", err)
+	}
+	if len(results) != 2 {
+		t.Errorf("expected len(results) == %d, got %d", 2, len(results))
+	}
+	for _, result := range results {
+		user, ok := result.(*userWithMissingColumns)
+		if !ok {
+			t.Errorf("expected user as result")
+		}
+		if user.Id <= 0 {
+			t.Errorf("expected user to have an Id > 0, got %d", user.Id)
+		}
+		// Column expected to be != ""
+		if user.Name == "" {
+			t.Errorf("expected user to have Name != \"\", got %v", user.Name)
 		}
 	}
 }
