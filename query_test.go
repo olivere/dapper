@@ -140,3 +140,69 @@ func TestComplexQuery(t *testing.T) {
 		t.Errorf("expected %v, got %v", expected, sql)
 	}
 }
+
+func TestQueryLike(t *testing.T) {
+	sql := Q("tweets").
+		Where().Like("message", "%Google%").
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message LIKE '%Google%'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+func TestQueryNotLike(t *testing.T) {
+	sql := Q("tweets").
+		Where().NotLike("message", "%Google%").
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message NOT LIKE '%Google%'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+func TestQueryInClause(t *testing.T) {
+	sql := Q("tweets").
+		Where().In("id", 1,2).
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE id IN (1,2)"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+func TestQueryInClauseAsArray(t *testing.T) {
+	sql := Q("tweets").
+		Where().In("id", []int{1,2}).
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE id IN (1,2)"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+func TestQueryNotInClause(t *testing.T) {
+	sql := Q("tweets").
+		Where().NotIn("id", 1,2).
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE id NOT IN (1,2)"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+func TestQueryNotInClauseAsArray(t *testing.T) {
+	sql := Q("tweets").
+		Where().NotIn("id", []int{1,2}).
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE id NOT IN (1,2)"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}

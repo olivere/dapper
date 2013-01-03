@@ -3,6 +3,7 @@ package dapper
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 )
 
 // Represents a SQL query on a SQL database.
@@ -279,6 +280,30 @@ func (wc *whereClause) Ne(column string, value interface{}) *whereClause {
 	return wc
 }
 
+func (wc *whereClause) Like(column string, value interface{}) *whereClause {
+	c := whereLike{wc.q, column, value}
+	wc.nodes = append(wc.nodes, c)
+	return wc
+}
+
+func (wc *whereClause) NotLike(column string, value interface{}) *whereClause {
+	c := whereNotLike{wc.q, column, value}
+	wc.nodes = append(wc.nodes, c)
+	return wc
+}
+
+func (wc *whereClause) In(column string, values ...interface{}) *whereClause {
+	c := whereIn{wc.q, column, values}
+	wc.nodes = append(wc.nodes, c)
+	return wc
+}
+
+func (wc *whereClause) NotIn(column string, values ...interface{}) *whereClause {
+	c := whereNotIn{wc.q, column, values}
+	wc.nodes = append(wc.nodes, c)
+	return wc
+}
+
 func (wc *whereClause) Take(take int) *query {
 	return wc.q.Take(take)
 }
@@ -352,6 +377,108 @@ func (wne whereNotEqual) SubSql() string {
 		return fmt.Sprintf("%s%s%s", wne.column, "<>", Quote(wne.value))
 	}
 	return fmt.Sprintf("%s IS NOT NULL", wne.column)
+}
+
+// A where clause of type "column LIKE value"
+
+type whereLike struct {
+	q       *query
+	column  string
+	value   interface{}
+}
+
+func (w whereLike) Sql() string {
+	return w.q.Sql()
+}
+
+func (w whereLike) SubSql() string {
+	return fmt.Sprintf("%s LIKE %s", w.column, Quote(w.value))
+}
+
+// A where clause of type "column NOT LIKE value"
+
+type whereNotLike struct {
+	q       *query
+	column  string
+	value   interface{}
+}
+
+func (w whereNotLike) Sql() string {
+	return w.q.Sql()
+}
+
+func (w whereNotLike) SubSql() string {
+	return fmt.Sprintf("%s NOT LIKE %s", w.column, Quote(w.value))
+}
+
+// A where clause of type "column IN (...)"
+
+type whereIn struct {
+	q       *query
+	column  string
+	values  []interface{}
+}
+
+func (w whereIn) Sql() string {
+	return w.q.Sql()
+}
+
+func (w whereIn) SubSql() string {
+	var b bytes.Buffer
+	for i, value := range w.values {
+		// The element itself could be an array or a slice
+		inv := reflect.ValueOf(value)
+		if inv.Kind() == reflect.Slice || inv.Kind() == reflect.Array {
+			invlen := inv.Len()
+			for j := 0; j < invlen; j++ {
+				if j > 0 {
+					b.WriteString(",")
+				}
+				b.WriteString(Quote(inv.Index(j).Interface()))
+			}
+		} else {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString(Quote(value))
+		}
+	}
+	return fmt.Sprintf("%s IN (%s)", w.column, b.String())
+}
+
+// A where clause of type "column NOT IN (...)"
+
+type whereNotIn struct {
+	q       *query
+	column  string
+	values  []interface{}
+}
+
+func (w whereNotIn) Sql() string {
+	return w.q.Sql()
+}
+
+func (w whereNotIn) SubSql() string {
+	var b bytes.Buffer
+	for i, value := range w.values {
+		// The element itself could be an array or a slice
+		inv := reflect.ValueOf(value)
+		if inv.Kind() == reflect.Slice || inv.Kind() == reflect.Array {
+			invlen := inv.Len()
+			for j := 0; j < invlen; j++ {
+				if j > 0 {
+					b.WriteString(",")
+				}
+				b.WriteString(Quote(inv.Index(j).Interface()))
+			}
+		} else {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString(Quote(value))
+		}
+	}
+	return fmt.Sprintf("%s NOT IN (%s)", w.column, b.String())
 }
 
 // Order clause
