@@ -220,13 +220,14 @@ func TestTypeCache(t *testing.T) {
 	}
 }
 
-func TestFirst(t *testing.T) {
+func TestSingle(t *testing.T) {
 	db := setup(t)
 	defer db.Close()
-	
+
+	session := New(db)
 	in := user{Id: 1}
-	out := user{}
-	err := First(db, "select * from users where id=:Id", in, &out)
+	var out user
+	err := session.Find("select * from users where id=:Id", in).Single(&out)
 	if err != nil {
 		t.Fatalf("error on First: %v", err)
 	}
@@ -246,13 +247,14 @@ func TestFirst(t *testing.T) {
 	}
 }
 
-func TestFirstWithoutDataReturnsErrNoRows(t *testing.T) {
+func TestSingleWithoutDataReturnsErrNoRows(t *testing.T) {
 	db := setup(t)
 	defer db.Close()
-	
+
+	session := New(db)
 	in := user{Id: 42}
-	out := user{}
-	err := First(db, "select * from users where id=:Id", in, &out)
+	var out user
+	err := session.Find("select * from users where id=:Id", in).Single(&out)
 	if err == nil {
 		t.Fatalf("expected an error, got %v", err)
 	}
@@ -261,13 +263,15 @@ func TestFirstWithoutDataReturnsErrNoRows(t *testing.T) {
 	}
 }
 
-func TestFirstWithProjection(t *testing.T) {
+func TestSingleWithProjection(t *testing.T) {
 	db := setup(t)
 	defer db.Close()
-	
+
+	session := New(db)
+
 	in := user{Id: 1}
-	out := user{}
-	err := First(db, "select name from users where id=:Id", in, &out)
+	var out user
+	err := session.Find("select name from users where id=:Id", in).Single(&out)
 	if err != nil {
 		t.Fatalf("error on First: %v", err)
 	}
@@ -285,22 +289,21 @@ func TestFirstWithProjection(t *testing.T) {
 	}
 }
 
-func TestQuery(t *testing.T) {
+func TestAll(t *testing.T) {
 	db := setup(t)
 	defer db.Close()
 
-	results, err := Query(db, "select * from users order by name", nil, reflect.TypeOf(user{}))
+	session := New(db)
+	var results []user
+
+	err := session.Find("select * from users order by name", nil).All(&results)
 	if err != nil {
 		t.Fatalf("error on Query: %v", err)
 	}
 	if len(results) != 2 {
 		t.Errorf("expected len(results) == %d, got %d", 2, len(results))
 	}
-	for _, result := range results {
-		user, ok := result.(*user)
-		if !ok {
-			t.Errorf("expected user as result")
-		}
+	for _, user := range results {
 		if user.Id <= 0 {
 			t.Errorf("expected user to have an Id > 0, got %d", user.Id)
 		}
@@ -313,22 +316,21 @@ func TestQuery(t *testing.T) {
 	}
 }
 
-func TestQueryWithProjections(t *testing.T) {
+func TestAllWithProjections(t *testing.T) {
 	db := setup(t)
 	defer db.Close()
 
-	results, err := Query(db, "select id,name from users order by name", nil, reflect.TypeOf(user{}))
+	session := New(db)
+	var results []user
+
+	err := session.Find("select id,name from users order by name", nil).All(&results)
 	if err != nil {
 		t.Fatalf("error on Query: %v", err)
 	}
 	if len(results) != 2 {
 		t.Errorf("expected len(results) == %d, got %d", 2, len(results))
 	}
-	for _, result := range results {
-		user, ok := result.(*user)
-		if !ok {
-			t.Errorf("expected user as result")
-		}
+	for _, user := range results {
 		if user.Id <= 0 {
 			t.Errorf("expected user to have an Id > 0, got %d", user.Id)
 		}
@@ -343,22 +345,21 @@ func TestQueryWithProjections(t *testing.T) {
 	}
 }
 
-func TestQueryIgnoresMissingColumns(t *testing.T) {
+func TestAllIgnoresMissingColumns(t *testing.T) {
 	db := setup(t)
 	defer db.Close()
 
-	results, err := Query(db, "select * from users order by name", nil, reflect.TypeOf(userWithMissingColumns{}))
+	session := New(db)
+	var results []userWithMissingColumns
+
+	err := session.Find("select * from users order by name", nil).All(&results)
 	if err != nil {
 		t.Fatalf("error on Query: %v", err)
 	}
 	if len(results) != 2 {
 		t.Errorf("expected len(results) == %d, got %d", 2, len(results))
 	}
-	for _, result := range results {
-		user, ok := result.(*userWithMissingColumns)
-		if !ok {
-			t.Errorf("expected user as result")
-		}
+	for _, user := range results {
 		if user.Id <= 0 {
 			t.Errorf("expected user to have an Id > 0, got %d", user.Id)
 		}
@@ -369,20 +370,67 @@ func TestQueryIgnoresMissingColumns(t *testing.T) {
 	}
 }
 
-func TestScalar(t *testing.T) {
+func TestScalarWithInt32(t *testing.T) {
 	db := setup(t)
 	defer db.Close()
 
-	result, err := Scalar(db, "select count(*) from users order by name", nil)
+	session := New(db)
+	var count int
+
+	err := session.Find("select id from users where id=1", nil).Scalar(&count)
 	if err != nil {
 		t.Fatalf("error on Query: %v", err)
 	}
-	count, ok := result.(int64)
-	if !ok {
-		t.Fatalf("expeced scalar to return an int64, got %v", result)
+	if count != 1 {
+		t.Errorf("expected name to be %d, got %d", 1, count)
 	}
-	if count != 2 {
-		t.Errorf("expected count of users == %d, got %d", 2, count)
+}
+
+func TestScalarWithFloat(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	session := New(db)
+	var karma float32
+
+	err := session.Find("select karma from users where id=1", nil).Scalar(&karma)
+	if err != nil {
+		t.Fatalf("error on Query: %v", err)
+	}
+	if karma != 42.13 {
+		t.Errorf("expected name to be %v, got %v", 42.13, karma)
+	}
+}
+
+func TestScalarWithString(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	session := New(db)
+	var name string
+
+	err := session.Find("select name from users where id=1", nil).Scalar(&name)
+	if err != nil {
+		t.Fatalf("error on Query: %v", err)
+	}
+	if name != "Oliver" {
+		t.Errorf("expected name to be %s, got %s", "Oliver", name)
+	}
+}
+
+func TestScalarWithoutDataReturnsErrNoRows(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	session := New(db)
+	var name string
+
+	err := session.Find("select name from users where id=42", nil).Scalar(&name)
+	if err == nil {
+		t.Fatalf("expected an error, got %v", err)
+	}
+	if err != sql.ErrNoRows {
+		t.Errorf("expected error %v, got %v", sql.ErrNoRows, err)
 	}
 }
 
@@ -390,7 +438,9 @@ func TestCount(t *testing.T) {
 	db := setup(t)
 	defer db.Close()
 
-	count, err := Count(db, "select count(*) from users order by name", nil)
+	session := New(db)
+
+	count, err := session.Count("select count(*) from users order by name", nil)
 	if err != nil {
 		t.Fatalf("error on Query: %v", err)
 	}
@@ -403,7 +453,9 @@ func TestCountWithWrongType(t *testing.T) {
 	db := setup(t)
 	defer db.Close()
 
-	_, err := Count(db, "select name from users order by name limit 1", nil)
+	session := New(db)
+
+	_, err := session.Count("select name from users order by name limit 1", nil)
 	if err != ErrWrongType {
 		t.Fatalf("expected ErrWrongType as error, got %v", err)
 	}

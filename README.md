@@ -44,6 +44,9 @@ I'd rather do something like this:
 
 ## Querying
 
+You can use the SQL generation as input for querying, or you create the
+SQL manually. Either way, querying works as follows.
+
 First, specify the "entities" and apply tags to let Dapper find
 a mapping between the struct field and the database column:
 
@@ -60,9 +63,13 @@ Of course, you need to connect to a database and get yourself a `*sql.DB`:
 
     db, err := sql.Open(...)
 
+Then create a Dapper session:
+
+    session := dapper.New(db)
+
 Now you can throw some SQL at Dapper and let it fill your result set:
 
-    // Build SQL statement
+    // Build SQL statement (or use a manually crafted SQL string)
     sql := dapper.Q("users").Alias("u").
         Join("tweets").Alias("t").On("u.id", "t.user_id").
         Project("u.name", "t.message").
@@ -71,17 +78,15 @@ Now you can throw some SQL at Dapper and let it fill your result set:
         Take(10).
         Sql()
 
-    // Run the query
-    results, err := dapper.Query(db, sql, nil, reflect.TypeOf(User{}))
+    // Run the query and return all users in a slice
+    var users []User
+    err := session.Find(sql, nil).All(&users)
     if err != nil {
         // ...
     }
 
     // Iterate
-    for _, result := range results {
-        // Cast to User
-        user, ok := result.(*User)
-        if !ok { ... }
+    for _, user := range users {
         fmt.Println(user.Name)
     }
 
@@ -102,8 +107,8 @@ struct that serves as a binding to the query. Here's how:
 
 To get the first result of a query:
 
-    // Create a User for storing the result
-    user := User{}
+    // Reserve a User variable for the result
+    var user User
 
     // Fill the binding for the query: UserId=1
     queryParam := UserByIdQuery{UserId: 1}
@@ -111,7 +116,7 @@ To get the first result of a query:
     // Now run the query:
     // Notice the ":UserId" will be retrieved from the binding, so the
     // SQL statement is: "select * from users where id=1"
-    err := dapper.First(db, "select * from users where id=:UserId", queryParam, &user)
+    err := session.Find("select * from users where id=:UserId", queryParam).Single(&user)
     if err != nil {
     	// ...
     }
@@ -121,23 +126,35 @@ To perform a query returning not a single entity but a slice:
     // Another binding
     queryParam := UsersByComplexQuery{MinKarma: 17.0, Country: "DE"}
 
-    // Results
-    // The reflect.TypeOf(...) is ugly, I know.
-    results, err := dapper.Query("select * from users "+
+    // Retrieve the results
+    var results []User
+    err := session.Find("select * from users "+
         "where karma > :MinKarma and country = :Country "+
-        "order by name limit 30", queryParam, reflect.TypeOf(User{}))
+        "order by name limit 30", queryParam).All(&results)
     if err != nil {
         // ...
     }
 
     // Iterate
-    for _, result := range results {
-        // Cast to User
-        user, ok := result.(*User)
-        if !ok { ... }
+    for _, user := range users {
         fmt.Println(user.Name)
     }
 
+You can also retrieve the first column of the first row by using the
+Scalar function:
+
+    // Create a var for the result
+    var name string 
+
+    // Stores the user name
+    err := session.Find("select name from users where id=1", nil).Scalar(&name)
+
+As counting is a very common operating, there is a shortcut:
+
+    // Returns the number of users
+	  count, err := session.Count("select count(*) from users", nil)
+
+    
 ## Credits
 
 * [Sam Saffron](http://www.samsaffron.com/) for Dapper.
