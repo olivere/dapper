@@ -143,11 +143,15 @@ func (q *finder) All(result interface{}) error {
 	slicev = slicev.Slice(0, slicev.Cap())
 	elemt := slicev.Type().Elem()
 
-	if elemt.Kind() == reflect.Ptr {
-		return errors.New("element type of result slice must not be a pointer")
+	// We accept both slices of structs or slices of pointers to structs
+	elemIsPtr := elemt.Kind() == reflect.Ptr
+
+	gotype := elemt
+	if elemIsPtr {
+		gotype = elemt.Elem()
 	}
 
-	resultInfo, err := AddType(elemt)
+	resultInfo, err := AddType(gotype)
 	if err != nil {
 		return err
 	}
@@ -181,7 +185,7 @@ func (q *finder) All(result interface{}) error {
 	var placeholder interface{}
 	for rows.Next() {
 		// Prepare destination fields for Scan
-		singleResult := reflect.New(elemt)
+		singleResult := reflect.New(gotype)
 
 		resultFields := make([]interface{}, 0)
 		dbColumnNames, err := rows.Columns()
@@ -211,7 +215,11 @@ func (q *finder) All(result interface{}) error {
 		}
 
 		// Add resultFields to slice
-		slicev = reflect.Append(slicev, singleResult.Elem())
+		if elemIsPtr {
+			slicev = reflect.Append(slicev, singleResult.Elem().Addr())
+		} else {
+			slicev = reflect.Append(slicev, singleResult.Elem())
+		}
 
 		i++
 	}

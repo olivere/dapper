@@ -323,9 +323,23 @@ func TestAllWithPtrToModel(t *testing.T) {
 	session := New(db)
 	var results []*user
 
-	err := session.Find("select * from users order by name", nil).All(&results)
-	if err == nil {
-		t.Fatalf("expected error, but got nil")
+	err := session.Find("select * from users order by id", nil).All(&results)
+	if err != nil {
+		t.Fatalf("error on Query: %v", err)
+	}
+	if len(results) != 2 {
+		t.Errorf("expected len(results) == %d, got %d", 2, len(results))
+	}
+	for i, user := range results {
+		if user.Id != int64(i+1) {
+			t.Errorf("expected user to have id == %d, got %d", i+1, user.Id)
+		}
+		if user.Name == "" {
+			t.Errorf("expected user to have Name != \"\", got %v", user.Name)
+		}
+		if user.Karma == nil {
+			t.Errorf("expected user to have Karma != nil, got %v", user.Karma)
+		}
 	}
 }
 
