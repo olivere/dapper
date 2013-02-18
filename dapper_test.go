@@ -316,6 +316,19 @@ func TestAll(t *testing.T) {
 	}
 }
 
+func TestAllWithPtrToModel(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	session := New(db)
+	var results []*user
+
+	err := session.Find("select * from users order by name", nil).All(&results)
+	if err == nil {
+		t.Fatalf("expected error, but got nil")
+	}
+}
+
 func TestAllWithProjections(t *testing.T) {
 	db := setup(t)
 	defer db.Close()

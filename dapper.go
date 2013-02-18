@@ -51,9 +51,6 @@ func (q *finder) Single(result interface{}) error {
 	if resultValue.Kind() != reflect.Ptr {
 		return errors.New("result must be a pointer to a struct")
 	}
-	//if resultValue.IsNil() {
-	//	return errors.New("result is nil")
-	//}
 
 	indirectValue := reflect.Indirect(resultValue)
 	gotype := indirectValue.Type()
@@ -145,6 +142,10 @@ func (q *finder) All(result interface{}) error {
 	slicev := resultv.Elem()
 	slicev = slicev.Slice(0, slicev.Cap())
 	elemt := slicev.Type().Elem()
+
+	if elemt.Kind() == reflect.Ptr {
+		return errors.New("element type of result slice must not be a pointer")
+	}
 
 	resultInfo, err := AddType(elemt)
 	if err != nil {

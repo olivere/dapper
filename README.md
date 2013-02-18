@@ -154,6 +154,13 @@ As counting is a very common operating, there is a shortcut:
     // Returns the number of users
 	  count, err := session.Count("select count(*) from users", nil)
 
+
+## Running tests
+
+To run tests, you need a MySQL database called `dapper_test` and a user
+`dapper` (password: `dapper`) with access.
+
+Then run `go test`.
     
 ## Credits
 
