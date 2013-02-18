@@ -296,16 +296,16 @@ func TestAll(t *testing.T) {
 	session := New(db)
 	var results []user
 
-	err := session.Find("select * from users order by name", nil).All(&results)
+	err := session.Find("select * from users order by id", nil).All(&results)
 	if err != nil {
 		t.Fatalf("error on Query: %v", err)
 	}
 	if len(results) != 2 {
 		t.Errorf("expected len(results) == %d, got %d", 2, len(results))
 	}
-	for _, user := range results {
-		if user.Id <= 0 {
-			t.Errorf("expected user to have an Id > 0, got %d", user.Id)
+	for i, user := range results {
+		if user.Id != int64(i+1) {
+			t.Errorf("expected user to have id == %d, got %d", i+1, user.Id)
 		}
 		if user.Name == "" {
 			t.Errorf("expected user to have Name != \"\", got %v", user.Name)
