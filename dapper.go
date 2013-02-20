@@ -3,12 +3,15 @@ package dapper
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 )
 
 var (
 	ErrWrongType = errors.New("dapper: wrong type")
+	ErrNoTableName = errors.New("dapper: no table name specified")
+	ErrNoPrimaryKey = errors.New("dapper: no primary key column specified")
 )
 
 // Session represents an interface to a database.
@@ -296,3 +299,199 @@ func (s *Session) Count(sqlQuery string, param interface{}) (int64, error) {
 	}
 	return 0, ErrWrongType
 }
+
+
+// Insert adds the entity to the database.
+func (s *Session) Insert(entity interface{}) error {
+	// Get information about the entity
+	entityv := reflect.ValueOf(entity)
+	if entityv.Kind() != reflect.Ptr {
+		return errors.New("entity must be a pointer to a struct")
+	}
+
+	indirectValue := reflect.Indirect(entityv)
+	gotype := indirectValue.Type()
+
+	ti, err := AddType(gotype)
+	if err != nil {
+		return err
+	}
+
+	// Generate SQL query for insert
+	sql, err := s.generateInsertSql(ti, entity)
+	if err != nil {
+		return err
+	}
+
+	// Execute SQL query and return its result
+	res, err := s.db.Exec(sql)
+	if err != nil {
+		return err
+	}
+
+	// Set last insert id if the type has an autoincrement column
+	if fi, found := ti.HasAutoIncrement(); found {
+		newId, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		// Set autoincrement column to newly generated Id
+		field := entityv.Elem().FieldByName(fi.FieldName)
+		field.Set(reflect.ValueOf(newId))
+	}
+
+	return nil
+}
+
+func (s *Session) generateInsertSql(ti *typeInfo, entity interface{}) (string, error) {
+	if ti.TableName == "" {
+		return "", ErrNoTableName
+	}
+
+	entityv := reflect.ValueOf(entity)
+
+	cnames := make([]string, 0)
+	cvals := make([]string, 0)
+
+	for _, cname := range ti.ColumnNames {
+		if fi, found := ti.ColumnInfos[cname]; found {
+			if !fi.IsAutoIncrement || fi.IsTransient {
+				cnames = append(cnames, cname)
+
+				field := entityv.Elem().FieldByName(fi.FieldName)
+				value := field.Interface()
+				quoted := Quote(value)
+				cvals = append(cvals, quoted)
+			}
+		}
+	}
+
+	return fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
+		QuoteString(ti.TableName),
+		strings.Join(cnames, ", "),
+		strings.Join(cvals, ", ")), nil
+}
+
+// Update changes an already existing entity in the database.
+func (s *Session) Update(entity interface{}) error {
+	// Get information about the entity
+	entityv := reflect.ValueOf(entity)
+	entityIsPtr := entityv.Kind() == reflect.Ptr
+
+	gotype := entityv.Type()
+	if entityIsPtr {
+		gotype = entityv.Type().Elem()
+	}
+
+	ti, err := AddType(gotype)
+	if err != nil {
+		return err
+	}
+
+	// Generate SQL query for update
+	sql, err := s.generateUpdateSql(ti, entity)
+	if err != nil {
+		return err
+	}
+
+	// Execute SQL query and return its result
+	_, err = s.db.Exec(sql)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Session) generateUpdateSql(ti *typeInfo, entity interface{}) (string, error) {
+	if ti.TableName == "" {
+		return "", ErrNoTableName
+	}
+
+	entityv := reflect.ValueOf(entity)
+	if entityv.Kind() == reflect.Ptr {
+		entityv = entityv.Elem()
+	}
+
+	pk, found := ti.HasPrimaryKey()
+	if !found {
+		return "", ErrNoPrimaryKey
+	}
+	field := entityv.FieldByName(pk.FieldName)
+	pkval := field.Interface()
+
+	pairs := make([]string, 0)
+
+	for _, cname := range ti.ColumnNames {
+		if fi, found := ti.ColumnInfos[cname]; found {
+			if !fi.IsPrimaryKey || fi.IsTransient {
+				field = entityv.FieldByName(fi.FieldName)
+				value := field.Interface()
+				quoted := Quote(value)
+				pair := fmt.Sprintf("%s=%s", cname, quoted)
+				pairs = append(pairs, pair)
+			}
+		}
+	}
+
+	return fmt.Sprintf("UPDATE %s SET %s WHERE %s=%s",
+		QuoteString(ti.TableName),
+		strings.Join(pairs, ", "),
+		pk.ColumnName,
+		Quote(pkval)), nil
+}
+
+// Delete removes the entity from the database.
+func (s *Session) Delete(entity interface{}) error {
+	// Get information about the entity
+	entityv := reflect.ValueOf(entity)
+	entityIsPtr := entityv.Kind() == reflect.Ptr
+
+	gotype := entityv.Type()
+	if entityIsPtr {
+		gotype = entityv.Type().Elem()
+	}
+
+	ti, err := AddType(gotype)
+	if err != nil {
+		return err
+	}
+
+	// Generate SQL query for delete
+	sql, err := s.generateDeleteSql(ti, entity)
+	if err != nil {
+		return err
+	}
+
+	// Execute SQL query and return its result
+	_, err = s.db.Exec(sql)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Session) generateDeleteSql(ti *typeInfo, entity interface{}) (string, error) {
+	if ti.TableName == "" {
+		return "", ErrNoTableName
+	}
+
+	entityv := reflect.ValueOf(entity)
+	if entityv.Kind() == reflect.Ptr {
+		entityv = entityv.Elem()
+	}
+
+	pk, found := ti.HasPrimaryKey()
+	if !found {
+		return "", ErrNoPrimaryKey
+	}
+	field := entityv.FieldByName(pk.FieldName)
+	pkval := field.Interface()
+
+	return fmt.Sprintf("DELETE FROM %s WHERE %s=%s",
+		QuoteString(ti.TableName),
+		pk.ColumnName,
+		Quote(pkval)), nil
+}
+

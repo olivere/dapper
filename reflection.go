@@ -17,6 +17,8 @@ func init() {
 type typeInfo struct {
 	// The type in Go
 	Type reflect.Type
+	// Table name
+	TableName string
 	// Names of the type in Go
 	FieldNames []string
 	// Detailed information indexed by field name
@@ -51,6 +53,7 @@ func AddType(gotype reflect.Type) (*typeInfo, error) {
 
 	ti := &typeInfo{
 		Type:       gotype,
+		TableName:  "",
 		FieldNames: make([]string, 0),
 		FieldInfos: make(map[string]*fieldInfo),
 		ColumnNames: make([]string, 0),
@@ -92,6 +95,11 @@ func AddType(gotype reflect.Type) (*typeInfo, error) {
 					if t == "autoincrement" || t == "serial" {
 						fi.IsAutoIncrement = true
 					}
+					if strings.HasPrefix(t, "table") {
+						// table=xxx
+						tableAndName := strings.SplitN(t, "=", 2)
+						ti.TableName = tableAndName[1]
+					}
 				}
 			}
 		} else {
@@ -111,4 +119,26 @@ func AddType(gotype reflect.Type) (*typeInfo, error) {
 	}
 
 	return ti, nil
+}
+
+// HasAutoIncrement returns information about the autoincrement field
+// of the specified type.
+func (ti *typeInfo) HasAutoIncrement() (*fieldInfo, bool) {
+	for _, fi := range ti.FieldInfos {
+		if fi.IsAutoIncrement {
+			return fi, true
+		}
+	}
+	return nil, false
+}
+
+// HasPrimaryKey returns information about the primary key field
+// of the specified type.
+func (ti *typeInfo) HasPrimaryKey() (*fieldInfo, bool) {
+	for _, fi := range ti.FieldInfos {
+		if fi.IsPrimaryKey {
+			return fi, true
+		}
+	}
+	return nil, false
 }

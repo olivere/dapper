@@ -49,14 +49,28 @@ func (t *tweet) String() string {
 }
 
 type user struct {
-	Id        int64    `dapper:"id,primarykey,serial"`
+	Id        int64    `dapper:"id,primarykey,autoincrement,table=users"`
+	Name      string   `dapper:"name"`
+	Karma     *float64 `dapper:"karma"`
+	Suspended bool     `dapper:"suspended"`
+}
+
+type userWithoutTableNameTag struct {
+	Id        int64    `dapper:"id,primarykey,autoincrement"`
+	Name      string   `dapper:"name"`
+	Karma     *float64 `dapper:"karma"`
+	Suspended bool     `dapper:"suspended"`
+}
+
+type userWithoutPrimaryKeyTag struct {
+	Id        int64    `dapper:"id,autoincrement,table=users"`
 	Name      string   `dapper:"name"`
 	Karma     *float64 `dapper:"karma"`
 	Suspended bool     `dapper:"suspended"`
 }
 
 type userWithMissingColumns struct {
-	Id        int64    `dapper:"id,primarykey,serial"`
+	Id        int64    `dapper:"id,primarykey,autoincrement,table=users"`
 	Name      string   `dapper:"name"`
 }
 
@@ -485,5 +499,227 @@ func TestCountWithWrongType(t *testing.T) {
 	_, err := session.Count("select name from users order by name limit 1", nil)
 	if err != ErrWrongType {
 		t.Fatalf("expected ErrWrongType as error, got %v", err)
+	}
+}
+
+func TestInsert(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	session := New(db)
+
+	var oldCount int64
+	row := db.QueryRow("select count(*) from users")
+	row.Scan(&oldCount)
+
+	k := float64(42.3)
+	u := &user{
+		Name: "George",
+		Karma: &k,
+		Suspended: false,
+	}
+
+	err := session.Insert(u)
+	if err != nil {
+		t.Fatalf("error on Insert: %v", err)
+	}
+	if u.Id <= 0 {
+		t.Errorf("expected Id to be > 0, got %d", u.Id)
+	}
+
+	var newCount int64
+	row = db.QueryRow("select count(*) from users")
+	row.Scan(&newCount)
+
+	if newCount != oldCount+1 {
+		t.Errorf("expected users count to be %d, got %d", oldCount+1, newCount)
+	}
+}
+
+func TestInsertWithoutTableNameTagFails(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	session := New(db)
+
+	k := float64(42.3)
+	u := &userWithoutTableNameTag{
+		Name: "George",
+		Karma: &k,
+		Suspended: false,
+	}
+
+	err := session.Insert(u)
+	if err != ErrNoTableName {
+		t.Fatalf("expected dapper.ErrNoTableName, got: %v", err)
+	}
+}
+
+func TestUpdate(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	// Count users
+	var oldCount int64
+	row := db.QueryRow("select count(*) from users")
+	row.Scan(&oldCount)
+
+	// Retrieve user
+	session := New(db)
+	var u user
+	err := session.Find("select * from users where id=1", nil).Single(&u)
+	if err != nil {
+		t.Fatalf("error on find single: %v", err)
+	}
+
+	// Change user
+	u.Name = "Olli"
+
+	// Update user
+	err = session.Update(u)
+	if err != nil {
+		t.Fatalf("error on Update: %v", err)
+	}
+
+	// Reload user
+	var u2 user
+	session.Find("select * from users where id=1", nil).Single(&u2)
+	if u2.Name != u.Name {
+		t.Errorf("expected user name to be %s, got %s", u.Name, u2.Name)
+	}
+
+	// Check count again
+	var newCount int64
+	row = db.QueryRow("select count(*) from users")
+	row.Scan(&newCount)
+
+	if newCount != oldCount {
+		t.Errorf("expected users count to be %d, got %d", oldCount, newCount)
+	}
+}
+
+func TestUpdateWithPtrType(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	// Count users
+	var oldCount int64
+	row := db.QueryRow("select count(*) from users")
+	row.Scan(&oldCount)
+
+	// Retrieve user
+	session := New(db)
+	var u user
+	err := session.Find("select * from users where id=1", nil).Single(&u)
+	if err != nil {
+		t.Fatalf("error on find single: %v", err)
+	}
+
+	// Change user
+	u.Name = "Olli"
+
+	// Update user
+	err = session.Update(&u)
+	if err != nil {
+		t.Fatalf("error on Update: %v", err)
+	}
+
+	// Reload user
+	var u2 user
+	session.Find("select * from users where id=1", nil).Single(&u2)
+	if u2.Name != u.Name {
+		t.Errorf("expected user name to be %s, got %s", u.Name, u2.Name)
+	}
+
+	// Check count again
+	var newCount int64
+	row = db.QueryRow("select count(*) from users")
+	row.Scan(&newCount)
+
+	if newCount != oldCount {
+		t.Errorf("expected users count to be %d, got %d", oldCount, newCount)
+	}
+}
+
+func TestUpdateWithoutPrimaryKeyTagFails(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	// Retrieve user
+	session := New(db)
+	var u userWithoutPrimaryKeyTag
+	err := session.Find("select * from users where id=1", nil).Single(&u)
+
+	u.Name = "Olli"
+
+	err = session.Update(u)
+	if err != ErrNoPrimaryKey {
+		t.Fatalf("expected dapper.ErrNoPrimaryKey, got: %v", err)
+	}
+}
+
+func TestDelete(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	// Count users
+	var oldCount int64
+	row := db.QueryRow("select count(*) from users")
+	row.Scan(&oldCount)
+
+	// Retrieve user
+	session := New(db)
+	var u user
+	err := session.Find("select * from users where id=1", nil).Single(&u)
+	if err != nil {
+		t.Fatalf("error on find single: %v", err)
+	}
+
+	// Delete user
+	err = session.Delete(u)
+	if err != nil {
+		t.Fatalf("error on Delete: %v", err)
+	}
+
+	// Check count
+	var newCount int64
+	row = db.QueryRow("select count(*) from users")
+	row.Scan(&newCount)
+
+	if newCount != oldCount-1 {
+		t.Errorf("expected users count to be %d, got %d", oldCount-1, newCount)
+	}
+}
+
+func TestDeleteWithPtrType(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	// Count users
+	var oldCount int64
+	row := db.QueryRow("select count(*) from users")
+	row.Scan(&oldCount)
+
+	// Retrieve user
+	session := New(db)
+	var u user
+	err := session.Find("select * from users where id=1", nil).Single(&u)
+	if err != nil {
+		t.Fatalf("error on find single: %v", err)
+	}
+
+	// Delete user
+	err = session.Delete(&u)
+	if err != nil {
+		t.Fatalf("error on Delete: %v", err)
+	}
+
+	// Check count
+	var newCount int64
+	row = db.QueryRow("select count(*) from users")
+	row.Scan(&newCount)
+
+	if newCount != oldCount-1 {
+		t.Errorf("expected users count to be %d, got %d", oldCount-1, newCount)
 	}
 }
