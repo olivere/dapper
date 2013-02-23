@@ -51,13 +51,29 @@ First, specify the "entities" and apply tags to let Dapper find
 a mapping between the struct field and the database column:
 
     type User struct {
-        Id        int64      `dapper:"id,primarykey,autoincrement"`
-        Name      string     `dapper:"name"`
-        Country   string     `dapper:"country"`
-        Karma     *float64   `dapper:"karma"`
-        Suspended bool       `dapper:"suspended"`
-        Ignored   string     `dapper:"-"`
+        Id        int64    `dapper:"id,primarykey,autoincrement,table=users"`
+        Name      string   `dapper:"name"`
+        Country   string   `dapper:"country"`
+        Karma     *float64 `dapper:"karma"`
+        Suspended bool
+        Ignored   string   `dapper:"-"`
     }
+
+Notice the `dapper` field tags:
+
+* If you do not tag a field with `dapper`, the column name in the
+  generated SQL is the same as the field name. In the User struct above,
+  the `Suspended` field is generated as column name `Suspended`.
+* By default, all fields in the struct will be used to generate SQL. If
+  you do want a field to be ignored in SQL generation, mark it with
+  `dapper:"-"` (see `Ignored` above).
+* The first element of the `dapper` tag specifies the DB column name
+  (see `dapper:"name"` in `Name` field).
+* You may specify the table name in one `dapper` tag, see `Id` field in
+  the example above.
+* Use the `primarykey` tag element to mark a column as primary key.
+* Use the `autoincrement` tag element to mark a column as
+  auto-increment.
 
 Of course, you need to connect to a database and get yourself a `*sql.DB`:
 
@@ -154,6 +170,44 @@ As counting is a very common operating, there is a shortcut:
     // Returns the number of users
 	  count, err := session.Count("select count(*) from users", nil)
 
+## Insert, Update, and Delete
+
+For insert, update, and delete to work, you need to mark the struct with
+a primary key and a table name. Here's the example from above:
+
+    type User struct {
+        Id        int64    `dapper:"id,primarykey,autoincrement,table=users"`
+        ...
+    }
+
+Then insert some data:
+
+    // Create a session
+    session := dapper.New(db)
+
+    // Create a user
+    u := &User{
+        Name:    "Steve",
+        Country: "DE",
+    }
+    
+    // Now insert
+    err := session.Insert(u)
+    if err != nil { ... }
+
+    // BTW u.Id is now set
+ 
+Now let's update the user:
+
+    u.Name = "Peter"
+    
+    err := session.Update(u)
+    if err != nil { ... }
+
+... and delete:
+
+    err := session.Delete(u)
+    if err != nil { ... }
 
 ## Running tests
 
