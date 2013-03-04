@@ -17,7 +17,7 @@ const (
 )
 
 type tweet struct {
-	Id       int64     `dapper:"id,primarykey,serial"`
+	Id       int64     `dapper:"id,primarykey,autoincrement,table=tweets"`
 	UserId   int64     `dapper:"user_id"`
 	Message  string    `dapper:"message"`
 	Retweets int64     `dapper:"retweets"`
