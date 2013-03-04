@@ -150,6 +150,8 @@ CREATE TABLE tweets (
 	return db
 }
 
+// ---- Types ---------------------------------------------------------------
+
 func TestTypeCache(t *testing.T) {
 	db := setup(t)
 	defer db.Close()
@@ -234,6 +236,8 @@ func TestTypeCache(t *testing.T) {
 	}
 }
 
+// ---- Single --------------------------------------------------------------
+
 func TestSingle(t *testing.T) {
 	db := setup(t)
 	defer db.Close()
@@ -302,6 +306,8 @@ func TestSingleWithProjection(t *testing.T) {
 		t.Errorf("expected user.Suspended == %v, got %v", false, out.Suspended)
 	}
 }
+
+// ---- All -----------------------------------------------------------------
 
 func TestAll(t *testing.T) {
 	db := setup(t)
@@ -411,6 +417,8 @@ func TestAllIgnoresMissingColumns(t *testing.T) {
 	}
 }
 
+// ---- Scalar --------------------------------------------------------------
+
 func TestScalarWithInt32(t *testing.T) {
 	db := setup(t)
 	defer db.Close()
@@ -475,6 +483,8 @@ func TestScalarWithoutDataReturnsErrNoRows(t *testing.T) {
 	}
 }
 
+// ---- Count ---------------------------------------------------------------
+
 func TestCount(t *testing.T) {
 	db := setup(t)
 	defer db.Close()
@@ -501,6 +511,8 @@ func TestCountWithWrongType(t *testing.T) {
 		t.Fatalf("expected ErrWrongType as error, got %v", err)
 	}
 }
+
+// ---- Insert --------------------------------------------------------------
 
 func TestInsert(t *testing.T) {
 	db := setup(t)
@@ -554,6 +566,102 @@ func TestInsertWithoutTableNameTagFails(t *testing.T) {
 		t.Fatalf("expected dapper.ErrNoTableName, got: %v", err)
 	}
 }
+
+func TestInsertTx(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	session := New(db)
+
+	var oldCount int64
+	row := db.QueryRow("select count(*) from users")
+	row.Scan(&oldCount)
+
+	k := float64(42.3)
+	u := &user{
+		Name: "George",
+		Karma: &k,
+		Suspended: false,
+	}
+
+	// Begin transaction
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("error on db.Begin(): %v", err)
+	}
+
+	// Insert
+	err = session.InsertTx(tx, u)
+	if err != nil {
+		t.Fatalf("error on InsertTx: %v", err)
+	}
+	if u.Id <= 0 {
+		t.Errorf("expected Id to be > 0, got %d", u.Id)
+	}
+
+	// Commit transaction
+	err = tx.Commit()
+	if err != nil {
+		t.Fatalf("error on Commit: %v", err)
+	}
+
+	var newCount int64
+	row = db.QueryRow("select count(*) from users")
+	row.Scan(&newCount)
+
+	if newCount != oldCount+1 {
+		t.Errorf("expected users count to be %d, got %d", oldCount+1, newCount)
+	}
+}
+
+func TestInsertTxWithRollback(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	session := New(db)
+
+	var oldCount int64
+	row := db.QueryRow("select count(*) from users")
+	row.Scan(&oldCount)
+
+	k := float64(42.3)
+	u := &user{
+		Name: "George",
+		Karma: &k,
+		Suspended: false,
+	}
+
+	// Begin transaction
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("error on db.Begin(): %v", err)
+	}
+
+	// Insert
+	err = session.InsertTx(tx, u)
+	if err != nil {
+		t.Fatalf("error on InsertTx: %v", err)
+	}
+	if u.Id <= 0 {
+		t.Errorf("expected Id to be > 0, got %d", u.Id)
+	}
+
+	// Rollback transaction
+	err = tx.Rollback()
+	if err != nil {
+		t.Fatalf("error on Rollback: %v", err)
+	}
+
+	var newCount int64
+	row = db.QueryRow("select count(*) from users")
+	row.Scan(&newCount)
+
+	if newCount != oldCount {
+		t.Errorf("expected users count to be %d, got %d", oldCount, newCount)
+	}
+}
+
+// ---- Update --------------------------------------------------------------
 
 func TestUpdate(t *testing.T) {
 	db := setup(t)
@@ -658,6 +766,118 @@ func TestUpdateWithoutPrimaryKeyTagFails(t *testing.T) {
 	}
 }
 
+func TestUpdateTx(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	// Count users
+	var oldCount int64
+	row := db.QueryRow("select count(*) from users")
+	row.Scan(&oldCount)
+
+	// Retrieve user
+	session := New(db)
+	var u user
+	err := session.Find("select * from users where id=1", nil).Single(&u)
+	if err != nil {
+		t.Fatalf("error on find single: %v", err)
+	}
+
+	// Change user
+	u.Name = "Olli"
+
+	// Start transaction
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("error on db.Begin(): %v", err)
+	}
+
+	// Update user
+	err = session.UpdateTx(tx, u)
+	if err != nil {
+		t.Fatalf("error on UpdateTx: %v", err)
+	}
+
+	// Commit
+	err = tx.Commit()
+	if err != nil {
+		t.Fatalf("error on db.Commit(): %v", err)
+	}
+
+	// Reload user
+	var u2 user
+	session.Find("select * from users where id=1", nil).Single(&u2)
+	if u2.Name != u.Name {
+		t.Errorf("expected user name to be %s, got %s", u.Name, u2.Name)
+	}
+
+	// Check count again
+	var newCount int64
+	row = db.QueryRow("select count(*) from users")
+	row.Scan(&newCount)
+
+	if newCount != oldCount {
+		t.Errorf("expected users count to be %d, got %d", oldCount, newCount)
+	}
+}
+
+func TestUpdateTxRollback(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	// Count users
+	var oldCount int64
+	row := db.QueryRow("select count(*) from users")
+	row.Scan(&oldCount)
+
+	// Retrieve user
+	session := New(db)
+	var u user
+	err := session.Find("select * from users where id=1", nil).Single(&u)
+	if err != nil {
+		t.Fatalf("error on find single: %v", err)
+	}
+
+	// Start transaction
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("error on db.Begin(): %v", err)
+	}
+
+	// Change user
+	u.Name = "Olli"
+
+	// Update user
+	err = session.UpdateTx(tx, u)
+	if err != nil {
+		t.Fatalf("error on UpdateTx: %v", err)
+	}
+
+	// Rollback transaction
+	err = tx.Rollback()
+	if err != nil {
+		t.Fatalf("error on Rollback: %v", err)
+	}
+
+	// Reload user
+	var u2 user
+	session.Find("select * from users where id=1", nil).Single(&u2)
+	if u2.Name == u.Name {
+		t.Errorf("expected user name to be %s, got %s", u.Name, u2.Name)
+	}
+
+	// Check count again
+	var newCount int64
+	row = db.QueryRow("select count(*) from users")
+	row.Scan(&newCount)
+
+	if newCount != oldCount {
+		t.Errorf("expected users count to be %d, got %d", oldCount, newCount)
+	}
+}
+
+// ---- Delete --------------------------------------------------------------
+
 func TestDelete(t *testing.T) {
 	db := setup(t)
 	defer db.Close()
@@ -721,5 +941,95 @@ func TestDeleteWithPtrType(t *testing.T) {
 
 	if newCount != oldCount-1 {
 		t.Errorf("expected users count to be %d, got %d", oldCount-1, newCount)
+	}
+}
+
+func TestDeleteTx(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	// Count users
+	var oldCount int64
+	row := db.QueryRow("select count(*) from users")
+	row.Scan(&oldCount)
+
+	// Retrieve user
+	session := New(db)
+	var u user
+	err := session.Find("select * from users where id=1", nil).Single(&u)
+	if err != nil {
+		t.Fatalf("error on find single: %v", err)
+	}
+
+	// Get a transaction
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("error on db.Begin(): %v", err)
+	}
+
+	// Delete user
+	err = session.DeleteTx(tx, u)
+	if err != nil {
+		t.Fatalf("error on Delete: %v", err)
+	}
+
+	// Commit
+	err = tx.Commit()
+	if err != nil {
+		t.Fatalf("error on db.Commit(): %v", err)
+	}
+
+	// Check count
+	var newCount int64
+	row = db.QueryRow("select count(*) from users")
+	row.Scan(&newCount)
+
+	if newCount != oldCount-1 {
+		t.Errorf("expected users count to be %d, got %d", oldCount-1, newCount)
+	}
+}
+
+func TestDeleteTxRollback(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	// Count users
+	var oldCount int64
+	row := db.QueryRow("select count(*) from users")
+	row.Scan(&oldCount)
+
+	// Retrieve user
+	session := New(db)
+	var u user
+	err := session.Find("select * from users where id=1", nil).Single(&u)
+	if err != nil {
+		t.Fatalf("error on find single: %v", err)
+	}
+
+	// Get a transaction
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("error on db.Begin(): %v", err)
+	}
+
+	// Delete user
+	err = session.DeleteTx(tx, u)
+	if err != nil {
+		t.Fatalf("error on Delete: %v", err)
+	}
+
+	// Rollback
+	err = tx.Rollback()
+	if err != nil {
+		t.Fatalf("error on db.Rollback(): %v", err)
+	}
+
+	// Check count
+	var newCount int64
+	row = db.QueryRow("select count(*) from users")
+	row.Scan(&newCount)
+
+	if newCount != oldCount {
+		t.Errorf("expected users count to be %d, got %d", oldCount, newCount)
 	}
 }

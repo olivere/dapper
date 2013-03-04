@@ -40,6 +40,8 @@ func (s *Session) Find(sql string, param interface{}) *finder {
 	return &finder{s, s.db, sql, param}
 }
 
+// ---- Single ---------------------------------------------------------------
+
 // Single returns the first result of the SQL query in result.
 //
 // If no rows are found, sql.ErrNoRows is returned (see sql.QueryRow).
@@ -125,6 +127,8 @@ func (q *finder) Single(result interface{}) error {
 
 	return nil
 }
+
+// ---- All -----------------------------------------------------------------
 
 // All returns a slice of results of the SQL query in result.
 // The result parameter must be a pointer to a slice of query results.
@@ -232,6 +236,8 @@ func (q *finder) All(result interface{}) error {
 	return nil
 }
 
+// ---- Scalar --------------------------------------------------------------
+
 // Scalar runs the finder query and returns the value of the first column 
 // of the first row. This is useful for queries such as counting.
 // 
@@ -283,6 +289,8 @@ func (q *finder) Scalar(result interface{}) error {
 	return nil
 }
 
+// ---- Count ---------------------------------------------------------------
+
 // Count returns the count of the query as an int64.
 // If the result is not an int64, it returns ErrWrongType.
 // 
@@ -300,9 +308,20 @@ func (s *Session) Count(sqlQuery string, param interface{}) (int64, error) {
 	return 0, ErrWrongType
 }
 
+// ---- Insert --------------------------------------------------------------
 
 // Insert adds the entity to the database.
 func (s *Session) Insert(entity interface{}) error {
+	return s.insert(entity, nil)
+}
+
+// InsertTx adds the entity to the database.
+func (s *Session) InsertTx(tx *sql.Tx, entity interface{}) error {
+	return s.insert(entity, tx)
+}
+
+// Insert adds the entity to the database.
+func (s *Session) insert(entity interface{}, tx *sql.Tx) error {
 	// Get information about the entity
 	entityv := reflect.ValueOf(entity)
 	if entityv.Kind() != reflect.Ptr {
@@ -324,7 +343,7 @@ func (s *Session) Insert(entity interface{}) error {
 	}
 
 	// Execute SQL query and return its result
-	res, err := s.db.Exec(sql)
+	res, err := s.exec(tx, sql)
 	if err != nil {
 		return err
 	}
@@ -341,6 +360,13 @@ func (s *Session) Insert(entity interface{}) error {
 	}
 
 	return nil
+}
+
+func (s *Session) exec(tx *sql.Tx, sql string) (sql.Result, error) {
+	if tx == nil {
+		return s.db.Exec(sql)
+	}
+	return tx.Exec(sql)
 }
 
 func (s *Session) generateInsertSql(ti *typeInfo, entity interface{}) (string, error) {
@@ -372,8 +398,21 @@ func (s *Session) generateInsertSql(ti *typeInfo, entity interface{}) (string, e
 		strings.Join(cvals, ", ")), nil
 }
 
+// ---- Update --------------------------------------------------------------
+
 // Update changes an already existing entity in the database.
 func (s *Session) Update(entity interface{}) error {
+	return s.update(entity, nil)
+}
+
+// UpdateTx changes an already existing entity in the database, but runs
+// in a transaction.
+func (s *Session) UpdateTx(tx *sql.Tx, entity interface{}) error {
+	return s.update(entity, tx)
+}
+
+// Update changes an already existing entity in the database.
+func (s *Session) update(entity interface{}, tx *sql.Tx) error {
 	// Get information about the entity
 	entityv := reflect.ValueOf(entity)
 	entityIsPtr := entityv.Kind() == reflect.Ptr
@@ -394,10 +433,18 @@ func (s *Session) Update(entity interface{}) error {
 		return err
 	}
 
-	// Execute SQL query and return its result
-	_, err = s.db.Exec(sql)
-	if err != nil {
-		return err
+	if tx == nil {
+		// Execute SQL query and return its result
+		_, err = s.db.Exec(sql)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Execute SQL query and return its result
+		_, err = tx.Exec(sql)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -441,8 +488,20 @@ func (s *Session) generateUpdateSql(ti *typeInfo, entity interface{}) (string, e
 		Quote(pkval)), nil
 }
 
+// ---- Delete --------------------------------------------------------------
+
 // Delete removes the entity from the database.
 func (s *Session) Delete(entity interface{}) error {
+	return s.delete(entity, nil)
+}
+
+// DeleteTx removes the entity from the database, but runs in a transaction.
+func (s *Session) DeleteTx(tx *sql.Tx, entity interface{}) error {
+	return s.delete(entity, tx)
+}
+
+// Delete removes the entity from the database.
+func (s *Session) delete(entity interface{}, tx *sql.Tx) error {
 	// Get information about the entity
 	entityv := reflect.ValueOf(entity)
 	entityIsPtr := entityv.Kind() == reflect.Ptr
@@ -463,10 +522,18 @@ func (s *Session) Delete(entity interface{}) error {
 		return err
 	}
 
-	// Execute SQL query and return its result
-	_, err = s.db.Exec(sql)
-	if err != nil {
-		return err
+	if tx == nil {
+		// Execute SQL query and return its result
+		_, err = s.db.Exec(sql)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Execute SQL query n transaction and return its result
+		_, err = tx.Exec(sql)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

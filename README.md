@@ -154,6 +154,66 @@ As counting is a very common operating, there is a shortcut:
     // Returns the number of users
 	  count, err := session.Count("select count(*) from users", nil)
 
+## Insert, Update, and Delete
+
+You can also perform classic insert, update, and delete operations.
+
+Recall the `User` struct defined earlier:
+
+    type User struct {
+        Id        int64      `dapper:"id,primarykey,autoincrement"`
+        Name      string     `dapper:"name"`
+        Country   string     `dapper:"country"`
+        Karma     *float64   `dapper:"karma"`
+        Suspended bool       `dapper:"suspended"`
+        Ignored   string     `dapper:"-"`
+    }
+
+Now connect to a database and get yourself a `*sql.DB`:
+
+    db, err := sql.Open(...)
+
+Then grab a session:
+
+    session := dapper.New(db)
+
+Now here's how to insert:
+
+    // Create a user
+    u := &User{
+      Name: "Oliver",
+    }
+
+    // Insert into database
+    err = session.Insert(u)
+    if err != nil {
+      ...
+    }
+
+    // Notice that u.Id is now set as it is tagged with `autoincrement`
+    log.Printf("New user id = %d", u.Id)
+    
+If you want to insert in a transaction, use `InsertTx(tx, u)`.
+
+Update and delete is straightforward, too:
+
+    // Update user
+    u.Name = "Marilyn"
+
+    err = session.Update(u)
+    if err != nil {
+      ...
+    }
+
+    // Delete
+    err = session.Delete(u)
+    if err != nil {
+      ...
+    }
+ 
+Again, there are `UpdateTx(tx, u)` and `DeleteTx(tx, u)` methods
+available to run in the context of a database transaction.
+
 
 ## Running tests
 
