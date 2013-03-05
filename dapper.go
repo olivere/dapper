@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	ErrWrongType = errors.New("dapper: wrong type")
-	ErrNoTableName = errors.New("dapper: no table name specified")
+	ErrWrongType    = errors.New("dapper: wrong type")
+	ErrNoTableName  = errors.New("dapper: no table name specified")
 	ErrNoPrimaryKey = errors.New("dapper: no primary key column specified")
 )
 
@@ -21,10 +21,10 @@ type Session struct {
 
 // Finder is a type for querying the database.
 type finder struct {
-	session *Session
-	db *sql.DB
+	session  *Session
+	db       *sql.DB
 	sqlQuery string
-	param interface{}
+	param    interface{}
 }
 
 // New creates a Session from a database connection.
@@ -108,9 +108,9 @@ func (q *finder) Single(result interface{}) error {
 				// Ignore missing columns
 				resultFields = append(resultFields, &placeholder)
 				/*
-				return errors.New(
-					fmt.Sprintf("type %s: found no corresponding mapping "+
-						"for column %s in result", gotype, dbColName))
+					return errors.New(
+						fmt.Sprintf("type %s: found no corresponding mapping "+
+							"for column %s in result", gotype, dbColName))
 				*/
 			}
 		}
@@ -208,10 +208,10 @@ func (q *finder) All(result interface{}) error {
 				// Ignore missing columns
 				resultFields = append(resultFields, &placeholder)
 				/*
-				return nil, errors.New(
-					fmt.Sprintf("type %s: found no corresponding mapping "+
-						"for column %s in result", gotype, dbColName))
-				//*/
+					return nil, errors.New(
+						fmt.Sprintf("type %s: found no corresponding mapping "+
+							"for column %s in result", gotype, dbColName))
+					//*/
 			}
 		}
 
@@ -561,4 +561,3 @@ func (s *Session) generateDeleteSql(ti *typeInfo, entity interface{}) (string, e
 		pk.ColumnName,
 		Quote(pkval)), nil
 }
-

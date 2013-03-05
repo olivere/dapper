@@ -9,12 +9,12 @@ import (
 // Represents a SQL query on a SQL database.
 
 type query struct {
-	t            *tableClause
-	columns      []string
-	joins        []*joinClause
-	where        *whereClause
-	limit        *limitClause
-	orders       []*orderClause
+	t       *tableClause
+	columns []string
+	joins   []*joinClause
+	where   *whereClause
+	limit   *limitClause
+	orders  []*orderClause
 }
 
 func Q(table string) *query {
@@ -192,10 +192,10 @@ func (t *tableClause) SubSql() string {
 // Joins
 
 type joinClause struct {
-	q  *query
-	t  *tableClause
-	kind string
-	left,right string
+	q           *query
+	t           *tableClause
+	kind        string
+	left, right string
 }
 
 func NewJoinClause(q *query, t *tableClause, kind string) *joinClause {
@@ -262,7 +262,7 @@ type whereClause struct {
 
 func NewWhereClause(query *query) *whereClause {
 	wc := &whereClause{
-		q: query,
+		q:     query,
 		nodes: make([]whereNode, 0),
 	}
 	return wc
@@ -344,9 +344,9 @@ type whereNode interface {
 // A where clause of type "column = value"
 
 type whereEqual struct {
-	q       *query
-	column  string
-	value   interface{}
+	q      *query
+	column string
+	value  interface{}
 }
 
 func (we whereEqual) Sql() string {
@@ -363,9 +363,9 @@ func (we whereEqual) SubSql() string {
 // A where clause of type "column != value"
 
 type whereNotEqual struct {
-	q       *query
-	column  string
-	value   interface{}
+	q      *query
+	column string
+	value  interface{}
 }
 
 func (wne whereNotEqual) Sql() string {
@@ -382,9 +382,9 @@ func (wne whereNotEqual) SubSql() string {
 // A where clause of type "column LIKE value"
 
 type whereLike struct {
-	q       *query
-	column  string
-	value   interface{}
+	q      *query
+	column string
+	value  interface{}
 }
 
 func (w whereLike) Sql() string {
@@ -398,9 +398,9 @@ func (w whereLike) SubSql() string {
 // A where clause of type "column NOT LIKE value"
 
 type whereNotLike struct {
-	q       *query
-	column  string
-	value   interface{}
+	q      *query
+	column string
+	value  interface{}
 }
 
 func (w whereNotLike) Sql() string {
@@ -414,9 +414,9 @@ func (w whereNotLike) SubSql() string {
 // A where clause of type "column IN (...)"
 
 type whereIn struct {
-	q       *query
-	column  string
-	values  []interface{}
+	q      *query
+	column string
+	values []interface{}
 }
 
 func (w whereIn) Sql() string {
@@ -449,9 +449,9 @@ func (w whereIn) SubSql() string {
 // A where clause of type "column NOT IN (...)"
 
 type whereNotIn struct {
-	q       *query
-	column  string
-	values  []interface{}
+	q      *query
+	column string
+	values []interface{}
 }
 
 func (w whereNotIn) Sql() string {
@@ -484,9 +484,9 @@ func (w whereNotIn) SubSql() string {
 // Order clause
 
 type orderClause struct {
-	q    *query
-	col  string
-	dir  string
+	q   *query
+	col string
+	dir string
 }
 
 func NewOrderClause(query *query) *orderClause {
@@ -533,16 +533,16 @@ func (c *orderClause) SubSql() string {
 // Limit clause
 
 type limitClause struct {
-	query   *query
-	skip    int
-	take    int
+	query *query
+	skip  int
+	take  int
 }
 
 func NewLimitClause(query *query) *limitClause {
 	lc := &limitClause{
-		query:  query,
-		skip: -1,
-		take: -1,
+		query: query,
+		skip:  -1,
+		take:  -1,
 	}
 	return lc
 }

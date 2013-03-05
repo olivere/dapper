@@ -38,9 +38,9 @@ type tweetByUserAndMinRetweets struct {
 }
 
 type sampleQuery struct {
-	Id          int64 `dapper:"id,primarykey,autoincrement"`
-	Ignore      string `dapper:"-"`
-	UserId      int64
+	Id     int64  `dapper:"id,primarykey,autoincrement"`
+	Ignore string `dapper:"-"`
+	UserId int64
 }
 
 func (t *tweet) String() string {
@@ -48,7 +48,12 @@ func (t *tweet) String() string {
 		t.Id, t.UserId, t.Message, t.Retweets, t.Created)
 }
 
+type validater interface {
+	Validate() bool
+}
+
 type user struct {
+	validater
 	Id        int64    `dapper:"id,primarykey,autoincrement,table=users"`
 	Name      string   `dapper:"name"`
 	Karma     *float64 `dapper:"karma"`
@@ -70,13 +75,17 @@ type userWithoutPrimaryKeyTag struct {
 }
 
 type userWithMissingColumns struct {
-	Id        int64    `dapper:"id,primarykey,autoincrement,table=users"`
-	Name      string   `dapper:"name"`
+	Id   int64  `dapper:"id,primarykey,autoincrement,table=users"`
+	Name string `dapper:"name"`
 }
 
 func (u *user) String() string {
 	return fmt.Sprintf("user[Id=%v,Name=%v,Karma=%v,Suspended=%v]",
 		u.Id, u.Name, u.Karma, u.Suspended)
+}
+
+func (u *user) Validate() bool {
+	return u.Name != ""
 }
 
 func setup(t *testing.T) *sql.DB {
@@ -526,8 +535,8 @@ func TestInsert(t *testing.T) {
 
 	k := float64(42.3)
 	u := &user{
-		Name: "George",
-		Karma: &k,
+		Name:      "George",
+		Karma:     &k,
 		Suspended: false,
 	}
 
@@ -556,8 +565,8 @@ func TestInsertWithoutTableNameTagFails(t *testing.T) {
 
 	k := float64(42.3)
 	u := &userWithoutTableNameTag{
-		Name: "George",
-		Karma: &k,
+		Name:      "George",
+		Karma:     &k,
 		Suspended: false,
 	}
 
@@ -579,8 +588,8 @@ func TestInsertTx(t *testing.T) {
 
 	k := float64(42.3)
 	u := &user{
-		Name: "George",
-		Karma: &k,
+		Name:      "George",
+		Karma:     &k,
 		Suspended: false,
 	}
 
@@ -626,8 +635,8 @@ func TestInsertTxWithRollback(t *testing.T) {
 
 	k := float64(42.3)
 	u := &user{
-		Name: "George",
-		Karma: &k,
+		Name:      "George",
+		Karma:     &k,
 		Suspended: false,
 	}
 

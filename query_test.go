@@ -165,7 +165,7 @@ func TestQueryNotLike(t *testing.T) {
 
 func TestQueryInClause(t *testing.T) {
 	sql := Q("tweets").
-		Where().In("id", 1,2).
+		Where().In("id", 1, 2).
 		Sql()
 
 	expected := "SELECT * FROM tweets WHERE id IN (1,2)"
@@ -176,7 +176,7 @@ func TestQueryInClause(t *testing.T) {
 
 func TestQueryInClauseAsArray(t *testing.T) {
 	sql := Q("tweets").
-		Where().In("id", []int{1,2}).
+		Where().In("id", []int{1, 2}).
 		Sql()
 
 	expected := "SELECT * FROM tweets WHERE id IN (1,2)"
@@ -187,7 +187,7 @@ func TestQueryInClauseAsArray(t *testing.T) {
 
 func TestQueryNotInClause(t *testing.T) {
 	sql := Q("tweets").
-		Where().NotIn("id", 1,2).
+		Where().NotIn("id", 1, 2).
 		Sql()
 
 	expected := "SELECT * FROM tweets WHERE id NOT IN (1,2)"
@@ -198,7 +198,7 @@ func TestQueryNotInClause(t *testing.T) {
 
 func TestQueryNotInClauseAsArray(t *testing.T) {
 	sql := Q("tweets").
-		Where().NotIn("id", []int{1,2}).
+		Where().NotIn("id", []int{1, 2}).
 		Sql()
 
 	expected := "SELECT * FROM tweets WHERE id NOT IN (1,2)"

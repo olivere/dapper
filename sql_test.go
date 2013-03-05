@@ -12,25 +12,25 @@ type QuoteTest struct {
 }
 
 var (
-	oliver = "Oliver"
-	int_1 = int(1)
-	int16_1 = int(1)
-	int32_1 = int(1)
-	int64_1 = int(1)
-	uint_1 = int(1)
-	uint16_1 = int(1)
-	uint32_1 = int(1)
-	uint64_1 = int(1)
-	float32_0_0 = float32(0.0)
-	float32_1_0 = float32(1.0)
-	float32_1_5 = float32(1.5)
+	oliver       = "Oliver"
+	int_1        = int(1)
+	int16_1      = int(1)
+	int32_1      = int(1)
+	int64_1      = int(1)
+	uint_1       = int(1)
+	uint16_1     = int(1)
+	uint32_1     = int(1)
+	uint64_1     = int(1)
+	float32_0_0  = float32(0.0)
+	float32_1_0  = float32(1.0)
+	float32_1_5  = float32(1.5)
 	float32_m1_0 = float32(-1.0)
 	float32_m1_5 = float32(-1.5)
-	bool_true = true
-	bool_false = false
+	bool_true    = true
+	bool_false   = false
 )
 
-var quotetests = []QuoteTest {
+var quotetests = []QuoteTest{
 	{"NULL", nil, "NULL"},
 	{"Empty string", "", "''"},
 	{"Double-quotes", "Mc'Allister", "'Mc''Allister'"},
@@ -82,10 +82,9 @@ func TestQuoteTime(t *testing.T) {
 	if got != expected {
 		t.Errorf("time.Time: expected %v, got %v", expected, got)
 	}
-	
+
 	got = Quote(&dt)
 	if got != expected {
 		t.Errorf("&time.Time: expected %v, got %v", expected, got)
 	}
 }
-

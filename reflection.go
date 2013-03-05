@@ -52,10 +52,10 @@ func AddType(gotype reflect.Type) (*typeInfo, error) {
 	}
 
 	ti := &typeInfo{
-		Type:       gotype,
-		TableName:  "",
-		FieldNames: make([]string, 0),
-		FieldInfos: make(map[string]*fieldInfo),
+		Type:        gotype,
+		TableName:   "",
+		FieldNames:  make([]string, 0),
+		FieldInfos:  make(map[string]*fieldInfo),
 		ColumnNames: make([]string, 0),
 		ColumnInfos: make(map[string]*fieldInfo),
 	}
@@ -64,6 +64,18 @@ func AddType(gotype reflect.Type) (*typeInfo, error) {
 	n := gotype.NumField()
 	for i := 0; i < n; i++ {
 		field := gotype.Field(i)
+
+		// Only support certain types of fields
+		switch field.Type.Kind() {
+		case reflect.Chan,
+			reflect.Func,
+			reflect.Interface,
+			reflect.Map,
+			reflect.Slice,
+			reflect.Struct,
+			reflect.UnsafePointer:
+			continue
+		}
 
 		fi := &fieldInfo{
 			FieldName:       field.Name,
