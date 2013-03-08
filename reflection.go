@@ -72,7 +72,7 @@ func AddType(gotype reflect.Type) (*typeInfo, error) {
 			reflect.Interface,
 			reflect.Map,
 			reflect.Slice,
-			reflect.Struct,
+			//reflect.Struct,
 			reflect.UnsafePointer:
 			continue
 		}

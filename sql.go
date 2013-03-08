@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"regexp"
 	"time"
+	"github.com/ziutek/mymysql/mysql"
 )
 
 var (
@@ -100,6 +101,14 @@ func Quote(val interface{}) string {
 		if data != nil {
 			t := val.(*time.Time)
 			return fmt.Sprintf("'%s'", QuoteString((*t).Format("2006-01-02 15:04:05")))
+		}
+		return "NULL"
+	case mysql.Date:
+		return fmt.Sprintf("'%s'", QuoteString(data.String()))
+	case *mysql.Date:
+		if data != nil {
+			t := val.(*mysql.Date)
+			return fmt.Sprintf("'%s'", QuoteString((*t).String()))
 		}
 		return "NULL"
 	}

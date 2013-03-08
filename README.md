@@ -219,7 +219,21 @@ To run tests, you need a MySQL database called `dapper_test` and a user
 `dapper` (password: `dapper`) with access.
 
 Then run `go test`.
-    
+
+## Known issues
+
+* Dapper is not targeting a specific Go MySQL driver. However, at the
+  current time, we are limited to [Michał Derkacz's](https://github.com/ziutek)
+  [mymysql driver](https://github.com/ziutek/mymysql/). The reason
+  for this is that it provides a mapping between the various
+  date/time-types in MySQL and `time.Time` in Golang.
+  However, the `DATE` type in MySQL is mapped to `mysql.Date`, and
+  Dapper handles that.
+* We are looking forward to support [Julien Schmidt](https://github.com/JulienSchmidt) 
+  [Go-SQL-Driver/MySQL](https://github.com/Go-SQL-Driver/MySQL) as well.
+  Julien has not yet decided how to handle `time.Time`
+  ([see issue #9](https://github.com/Go-SQL-Driver/MySQL/issues/9)).
+
 ## Credits
 
 * [Sam Saffron](http://www.samsaffron.com/) for Dapper.

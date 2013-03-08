@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ziutek/mymysql/mysql"
 	_ "github.com/ziutek/mymysql/godrv"
 )
 
@@ -15,6 +16,28 @@ const (
 	testDBUser = "dapper"
 	testDBPass = "dapper"
 )
+
+type cruddy struct {
+	Id          int64      `dapper:"id,primarykey,autoincrement,table=cruddy"`
+	Int         int        `dapper:"c_int"`
+	Int32       int32      `dapper:"c_int32"`
+	Int64       int64      `dapper:"c_int64"`
+	Uint        uint       `dapper:"c_uint"`
+	Uint32      uint32     `dapper:"c_uint32"`
+	Uint64      uint64     `dapper:"c_uint64"`
+	Float32     float32    `dapper:"c_float32"`
+	Float64     float64    `dapper:"c_float64"`
+	Decimal     float64    `dapper:"c_decimal"`
+	Date        mysql.Date `dapper:"c_date"`
+	DatePtr     *mysql.Date `dapper:"c_date_ptr"`
+	DateTime    time.Time  `dapper:"c_datetime"`
+	DateTimePtr *time.Time `dapper:"c_datetime_ptr"`
+	Timestamp   *time.Time `dapper:"c_timestamp"`
+	Bool        bool       `dapper:"c_bool"`
+	Char        string     `dapper:"c_char"`
+	Varchar     string     `dapper:"c_varchar"`
+	Text        string     `dapper:"c_text"`
+}
 
 type tweet struct {
 	Id       int64     `dapper:"id,primarykey,autoincrement,table=tweets"`
@@ -106,7 +129,39 @@ func setup(t *testing.T) *sql.DB {
 		t.Fatalf("error dropping users table: %v", err)
 	}
 
+	_, err = db.Exec("DROP TABLE IF EXISTS cruddy")
+	if err != nil {
+		t.Fatalf("error dropping cruddy table: %v", err)
+	}
+
 	// Create tables
+	_, err = db.Exec(`
+CREATE TABLE cruddy (
+        id int(11) not null auto_increment,
+		c_int int(11),
+		c_int32 int(11),
+		c_int64 int(11),
+		c_uint  int(11),
+		c_uint32 int(11),
+		c_uint64 int(11),
+		c_float32 float,
+		c_float64 float,
+		c_decimal decimal(19,5),
+		c_date date,
+		c_date_ptr date,
+		c_datetime datetime,
+		c_datetime_ptr datetime,
+		c_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+		c_bool bool,
+		c_char char(3),
+		c_varchar varchar(20),
+		c_text text,
+        primary key (id)
+)`)
+	if err != nil {
+		t.Fatalf("error creating cruddy table: %v", err)
+	}
+
 	_, err = db.Exec(`
 CREATE TABLE users (
         id int(11) not null auto_increment,
@@ -242,6 +297,60 @@ func TestTypeCache(t *testing.T) {
 	}
 	if !fi.IsTransient {
 		t.Errorf("expected field Ignore to be transient")
+	}
+}
+
+// ---- CRUD with all data types ---------------------------------------------
+
+func TestCRUD(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	session := New(db)
+	now := time.Now()
+	dt, _ := mysql.ParseDate("2013-01-02")
+	in := cruddy{
+		Int:         1,
+		Int32:       int32(2),
+		Int64:       int64(3),
+		Uint:        uint(4),
+		Uint32:      uint32(5),
+		Uint64:      uint64(6),
+		Float32:     float32(7.1),
+		Float64:     float64(8.2),
+		Decimal:     float64(9.33),
+		Date:        dt,
+		DatePtr:     &dt,
+		DateTime:    now,
+		DateTimePtr: &now,
+		Timestamp:   nil,
+		Bool:        true,
+		Char:        "A C",
+		Varchar:     "123456789012345678901",
+		Text:        "Very long text",
+	}
+
+	// Insert
+	err := session.Insert(&in)
+	if err != nil {
+		t.Fatalf("error on Insert: %v", err)
+	}
+	if in.Id <= 0 {
+		t.Errorf("expected Id to be > 0, got %d", in.Id)
+	}
+
+	// Load again
+	qbe := struct{ Id int64 }{Id: in.Id}
+	var out cruddy
+	err = session.Find("select * from cruddy where id=:Id", qbe).Single(&out)
+	if err != nil {
+		t.Fatalf("error on Single: %v", err)
+	}
+	if out.Id != in.Id {
+		t.Errorf("expected out.Id == %d, got %d", in.Id, out.Id)
+	}
+	if out.Int != in.Int {
+		t.Errorf("expected out.Int == %d, got %d", in.Int, out.Int)
 	}
 }
 
