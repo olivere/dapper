@@ -9,7 +9,6 @@ import (
 )
 
 var (
-	ErrWrongType    = errors.New("dapper: wrong type")
 	ErrNoTableName  = errors.New("dapper: no table name specified")
 	ErrNoPrimaryKey = errors.New("dapper: no primary key column specified")
 )
@@ -297,15 +296,12 @@ func (q *finder) Scalar(result interface{}) error {
 // Example:
 // count, err := session.Count("select count(*) from users", nil)
 func (s *Session) Count(sqlQuery string, param interface{}) (int64, error) {
-	var result interface{}
-	err := s.Find(sqlQuery, param).Scalar(&result)
+	var count int64
+	err := s.Find(sqlQuery, param).Scalar(&count)
 	if err != nil {
 		return 0, err
 	}
-	if count, ok := result.(int64); ok {
-		return count, nil
-	}
-	return 0, ErrWrongType
+	return count, nil
 }
 
 // ---- Insert --------------------------------------------------------------
