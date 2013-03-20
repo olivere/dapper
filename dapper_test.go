@@ -40,11 +40,12 @@ type cruddy struct {
 }
 
 type tweet struct {
-	Id       int64     `dapper:"id,primarykey,autoincrement,table=tweets"`
-	UserId   int64     `dapper:"user_id"`
-	Message  string    `dapper:"message"`
-	Retweets int64     `dapper:"retweets"`
-	Created  time.Time `dapper:"created"`
+	Id         int64     `dapper:"id,primarykey,autoincrement,table=tweets"`
+	UserId     int64     `dapper:"user_id"`
+	Message    string    `dapper:"message"`
+	Retweets   int64     `dapper:"retweets"`
+	//Created    time.Time `dapper:"created"`
+	CreatedStr string    `dapper:"created"`
 }
 
 type tweetById struct {
@@ -68,7 +69,15 @@ type sampleQuery struct {
 
 func (t *tweet) String() string {
 	return fmt.Sprintf("tweet[Id=%v,UserId=%v,Message=%v,Retweets=%v,Created=%v]",
-		t.Id, t.UserId, t.Message, t.Retweets, t.Created)
+		t.Id, t.UserId, t.Message, t.Retweets, t.Created())
+}
+
+func (t *tweet) Created() *time.Time {
+	tm, err := time.Parse(time.RFC3339, t.CreatedStr)
+	if err != nil {
+		return nil
+	}
+	return &tm
 }
 
 type validater interface {
@@ -326,7 +335,7 @@ func TestCRUD(t *testing.T) {
 		Timestamp:   nil,
 		Bool:        true,
 		Char:        "A C",
-		Varchar:     "123456789012345678901",
+		Varchar:     "12345678901234567890",
 		Text:        "Very long text",
 	}
 
@@ -615,6 +624,23 @@ func TestCount(t *testing.T) {
 	}
 	if count != 2 {
 		t.Errorf("expected count of users == %d, got %d", 2, count)
+	}
+}
+
+func TestCountWithQueryParams(t *testing.T) {
+	db := setup(t)
+	defer db.Close()
+
+	session := New(db)
+
+	qbe := struct { Id int64 }{ 1 }
+
+	count, err := session.Count("select count(*) from users where id=:Id", qbe)
+	if err != nil {
+		t.Fatalf("error on Query: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected count of users == %d, got %d", 1, count)
 	}
 }
 
