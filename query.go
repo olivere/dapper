@@ -286,8 +286,20 @@ func (wc *whereClause) Eq(column string, value interface{}) *whereClause {
 	return wc
 }
 
+func (wc *whereClause) EqCol(column string, value string) *whereClause {
+	we := whereEqualColumn{wc.q, column, value}
+	wc.nodes = append(wc.nodes, we)
+	return wc
+}
+
 func (wc *whereClause) Ne(column string, value interface{}) *whereClause {
 	wne := whereNotEqual{wc.q, column, value}
+	wc.nodes = append(wc.nodes, wne)
+	return wc
+}
+
+func (wc *whereClause) NeCol(column string, value string) *whereClause {
+	wne := whereNotEqualColumn{wc.q, column, value}
 	wc.nodes = append(wc.nodes, wne)
 	return wc
 }
@@ -376,6 +388,22 @@ func (we whereEqual) SubSql() string {
 	return fmt.Sprintf("%s IS NULL", we.column)
 }
 
+// A where clause of type "column = value" and value is a column
+
+type whereEqualColumn struct {
+	q      *Query
+	column string
+	value  string
+}
+
+func (wec whereEqualColumn) Sql() string {
+	return wec.q.Sql()
+}
+
+func (wec whereEqualColumn) SubSql() string {
+	return fmt.Sprintf("%s%s%s", wec.column, "=", wec.value)
+}
+
 // A where clause of type "column != value"
 
 type whereNotEqual struct {
@@ -393,6 +421,22 @@ func (wne whereNotEqual) SubSql() string {
 		return fmt.Sprintf("%s%s%s", wne.column, "<>", Quote(wne.value))
 	}
 	return fmt.Sprintf("%s IS NOT NULL", wne.column)
+}
+
+// A where clause of type "column != value" and value is a column
+
+type whereNotEqualColumn struct {
+	q      *Query
+	column string
+	value  string
+}
+
+func (w whereNotEqualColumn) Sql() string {
+	return w.q.Sql()
+}
+
+func (w whereNotEqualColumn) SubSql() string {
+	return fmt.Sprintf("%s%s%s", w.column, "<>", w.value)
 }
 
 // A where clause of type "column LIKE value"

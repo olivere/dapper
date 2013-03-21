@@ -20,6 +20,11 @@ func TestSimpleQueries(t *testing.T) {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE expired IS NULL", sql)
 	}
 
+	sql = Q("users").Where().EqCol("expired", "expired2").Sql()
+	if sql != "SELECT * FROM users WHERE expired=expired2" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE expired=expired2", sql)
+	}
+
 	sql = Q("users").Where().Ne("id", 1).Sql()
 	if sql != "SELECT * FROM users WHERE id<>1" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id<>1", sql)
@@ -28,6 +33,11 @@ func TestSimpleQueries(t *testing.T) {
 	sql = Q("users").Where().Ne("expired", nil).Sql()
 	if sql != "SELECT * FROM users WHERE expired IS NOT NULL" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE expired IS NOT NULL", sql)
+	}
+
+	sql = Q("users").Where().NeCol("expired", "expired2").Sql()
+	if sql != "SELECT * FROM users WHERE expired<>expired2" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE expired<>expired2", sql)
 	}
 }
 
