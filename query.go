@@ -8,7 +8,7 @@ import (
 
 // Represents a SQL query on a SQL database.
 
-type query struct {
+type Query struct {
 	t       *tableClause
 	columns []string
 	joins   []*joinClause
@@ -17,8 +17,8 @@ type query struct {
 	orders  []*orderClause
 }
 
-func Q(table string) *query {
-	q := &query{}
+func Q(table string) *Query {
+	q := &Query{}
 	t := NewTableClause(q, table)
 	q.t = t
 	q.columns = make([]string, 1)
@@ -28,64 +28,64 @@ func Q(table string) *query {
 	return q
 }
 
-func (q *query) Alias(alias string) *query {
+func (q *Query) Alias(alias string) *Query {
 	q.t = q.t.Alias(alias)
 	return q
 }
 
-func (q *query) Project(columns ...string) *query {
+func (q *Query) Project(columns ...string) *Query {
 	q.columns = make([]string, 0)
 	q.columns = append(q.columns, columns...)
 	return q
 }
 
-func (q *query) Where() *whereClause {
+func (q *Query) Where() *whereClause {
 	q.where = NewWhereClause(q)
 	return q.where
 }
 
-func (q *query) Join(table string) *joinClause {
+func (q *Query) Join(table string) *joinClause {
 	t := NewTableClause(q, table)
 	j := NewJoinClause(q, t, "")
 	q.joins = append(q.joins, j)
 	return j
 }
 
-func (q *query) InnerJoin(table string) *joinClause {
+func (q *Query) InnerJoin(table string) *joinClause {
 	t := NewTableClause(q, table)
 	j := NewJoinClause(q, t, "INNER")
 	q.joins = append(q.joins, j)
 	return j
 }
 
-func (q *query) OuterJoin(table string) *joinClause {
+func (q *Query) OuterJoin(table string) *joinClause {
 	t := NewTableClause(q, table)
 	j := NewJoinClause(q, t, "OUTER")
 	q.joins = append(q.joins, j)
 	return j
 }
 
-func (q *query) LeftInnerJoin(table string) *joinClause {
+func (q *Query) LeftInnerJoin(table string) *joinClause {
 	t := NewTableClause(q, table)
 	j := NewJoinClause(q, t, "LEFT INNER")
 	q.joins = append(q.joins, j)
 	return j
 }
 
-func (q *query) LeftOuterJoin(table string) *joinClause {
+func (q *Query) LeftOuterJoin(table string) *joinClause {
 	t := NewTableClause(q, table)
 	j := NewJoinClause(q, t, "LEFT OUTER")
 	q.joins = append(q.joins, j)
 	return j
 }
 
-func (q *query) Order() *orderClause {
+func (q *Query) Order() *orderClause {
 	c := NewOrderClause(q)
 	q.orders = append(q.orders, c)
 	return c
 }
 
-func (q *query) Take(take int) *query {
+func (q *Query) Take(take int) *Query {
 	if q.limit == nil {
 		q.limit = &limitClause{}
 	}
@@ -93,7 +93,7 @@ func (q *query) Take(take int) *query {
 	return q
 }
 
-func (q *query) Skip(skip int) *query {
+func (q *Query) Skip(skip int) *Query {
 	if q.limit == nil {
 		q.limit = &limitClause{}
 	}
@@ -101,7 +101,11 @@ func (q *query) Skip(skip int) *query {
 	return q
 }
 
-func (q *query) Sql() string {
+func (q *Query) Query() *Query {
+	return q
+}
+
+func (q *Query) Sql() string {
 	var b bytes.Buffer
 	b.WriteString("SELECT ")
 	for i, column := range q.columns {
@@ -144,12 +148,12 @@ func (q *query) Sql() string {
 // Tables
 
 type tableClause struct {
-	q     *query
+	q     *Query
 	name  string
 	alias string
 }
 
-func NewTableClause(q *query, name string) *tableClause {
+func NewTableClause(q *Query, name string) *tableClause {
 	return &tableClause{q, name, ""}
 }
 
@@ -163,20 +167,24 @@ func (t *tableClause) Alias(alias string) *tableClause {
 	return t
 }
 
-func (t *tableClause) Project(columns ...string) *query {
+func (t *tableClause) Project(columns ...string) *Query {
 	return t.q.Project(columns...)
 }
 
-func (t *tableClause) Take(take int) *query {
+func (t *tableClause) Take(take int) *Query {
 	return t.q.Take(take)
 }
 
-func (t *tableClause) Skip(take int) *query {
+func (t *tableClause) Skip(take int) *Query {
 	return t.q.Skip(take)
 }
 
 func (t *tableClause) Sql() string {
 	return t.q.Sql()
+}
+
+func (t *tableClause) Query() *Query {
+	return t.q
 }
 
 func (t *tableClause) SubSql() string {
@@ -192,13 +200,13 @@ func (t *tableClause) SubSql() string {
 // Joins
 
 type joinClause struct {
-	q           *query
+	q           *Query
 	t           *tableClause
 	kind        string
 	left, right string
 }
 
-func NewJoinClause(q *query, t *tableClause, kind string) *joinClause {
+func NewJoinClause(q *Query, t *tableClause, kind string) *joinClause {
 	return &joinClause{q, t, kind, "", ""}
 }
 
@@ -222,16 +230,20 @@ func (j *joinClause) Join(table string) *joinClause {
 	return j.q.Join(table)
 }
 
-func (j *joinClause) Project(columns ...string) *query {
+func (j *joinClause) Project(columns ...string) *Query {
 	return j.q.Project(columns...)
 }
 
-func (j *joinClause) Take(take int) *query {
+func (j *joinClause) Take(take int) *Query {
 	return j.q.Take(take)
 }
 
-func (j *joinClause) Skip(take int) *query {
+func (j *joinClause) Skip(take int) *Query {
 	return j.q.Skip(take)
+}
+
+func (j *joinClause) Query() *Query {
+	return j.q
 }
 
 func (j *joinClause) Sql() string {
@@ -256,11 +268,11 @@ func (j *joinClause) SubSql() string {
 // Where clauses
 
 type whereClause struct {
-	q     *query
+	q     *Query
 	nodes []whereNode
 }
 
-func NewWhereClause(query *query) *whereClause {
+func NewWhereClause(query *Query) *whereClause {
 	wc := &whereClause{
 		q:     query,
 		nodes: make([]whereNode, 0),
@@ -304,20 +316,24 @@ func (wc *whereClause) NotIn(column string, values ...interface{}) *whereClause 
 	return wc
 }
 
-func (wc *whereClause) Project(columns ...string) *query {
+func (wc *whereClause) Project(columns ...string) *Query {
 	return wc.q.Project(columns...)
 }
 
-func (wc *whereClause) Take(take int) *query {
+func (wc *whereClause) Take(take int) *Query {
 	return wc.q.Take(take)
 }
 
-func (wc *whereClause) Skip(take int) *query {
+func (wc *whereClause) Skip(take int) *Query {
 	return wc.q.Skip(take)
 }
 
 func (wc *whereClause) Order() *orderClause {
 	return wc.q.Order()
+}
+
+func (wc *whereClause) Query() *Query {
+	return wc.q
 }
 
 func (wc *whereClause) Sql() string {
@@ -344,7 +360,7 @@ type whereNode interface {
 // A where clause of type "column = value"
 
 type whereEqual struct {
-	q      *query
+	q      *Query
 	column string
 	value  interface{}
 }
@@ -363,7 +379,7 @@ func (we whereEqual) SubSql() string {
 // A where clause of type "column != value"
 
 type whereNotEqual struct {
-	q      *query
+	q      *Query
 	column string
 	value  interface{}
 }
@@ -382,7 +398,7 @@ func (wne whereNotEqual) SubSql() string {
 // A where clause of type "column LIKE value"
 
 type whereLike struct {
-	q      *query
+	q      *Query
 	column string
 	value  interface{}
 }
@@ -398,7 +414,7 @@ func (w whereLike) SubSql() string {
 // A where clause of type "column NOT LIKE value"
 
 type whereNotLike struct {
-	q      *query
+	q      *Query
 	column string
 	value  interface{}
 }
@@ -414,7 +430,7 @@ func (w whereNotLike) SubSql() string {
 // A where clause of type "column IN (...)"
 
 type whereIn struct {
-	q      *query
+	q      *Query
 	column string
 	values []interface{}
 }
@@ -449,7 +465,7 @@ func (w whereIn) SubSql() string {
 // A where clause of type "column NOT IN (...)"
 
 type whereNotIn struct {
-	q      *query
+	q      *Query
 	column string
 	values []interface{}
 }
@@ -484,12 +500,12 @@ func (w whereNotIn) SubSql() string {
 // Order clause
 
 type orderClause struct {
-	q   *query
+	q   *Query
 	col string
 	dir string
 }
 
-func NewOrderClause(query *query) *orderClause {
+func NewOrderClause(query *Query) *orderClause {
 	c := &orderClause{
 		q:   query,
 		col: "",
@@ -514,12 +530,16 @@ func (c *orderClause) Order() *orderClause {
 	return c.q.Order()
 }
 
-func (c *orderClause) Take(take int) *query {
+func (c *orderClause) Take(take int) *Query {
 	return c.q.Take(take)
 }
 
-func (c *orderClause) Skip(take int) *query {
+func (c *orderClause) Skip(take int) *Query {
 	return c.q.Skip(take)
+}
+
+func (c *orderClause) Query() *Query {
+	return c.q
 }
 
 func (c *orderClause) Sql() string {
@@ -533,12 +553,12 @@ func (c *orderClause) SubSql() string {
 // Limit clause
 
 type limitClause struct {
-	query *query
+	query *Query
 	skip  int
 	take  int
 }
 
-func NewLimitClause(query *query) *limitClause {
+func NewLimitClause(query *Query) *limitClause {
 	lc := &limitClause{
 		query: query,
 		skip:  -1,
