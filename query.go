@@ -40,7 +40,9 @@ func (q *Query) Project(columns ...string) *Query {
 }
 
 func (q *Query) Where() *whereClause {
-	q.where = NewWhereClause(q)
+	if q.where == nil {
+		q.where = NewWhereClause(q)
+	}
 	return q.where
 }
 

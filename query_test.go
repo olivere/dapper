@@ -58,6 +58,16 @@ func TestQueryProjection(t *testing.T) {
 	}
 }
 
+func TestChainedQueries(t *testing.T) {
+	q := Q("users").Where().Eq("id", 1).Query()
+	q = q.Where().Eq("name", "Oliver").Query()
+	got := q.Sql()
+	expected := "SELECT * FROM users WHERE id=1 AND name='Oliver'"
+	if got != expected {
+		t.Errorf("expected %v, got %v", expected, got)
+	}
+}
+
 func TestQueryWithLimits(t *testing.T) {
 	sql := Q("users").Take(10).Sql()
 	if sql != "SELECT * FROM users LIMIT 10" {
