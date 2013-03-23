@@ -89,6 +89,7 @@ func (q *finder) Single(result interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer rows.Close()
 
 	// Scan fills all fields in dst here
 	var placeholder interface{}
@@ -186,6 +187,7 @@ func (q *finder) All(result interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer rows.Close()
 
 	i := 0
 	var placeholder interface{}
