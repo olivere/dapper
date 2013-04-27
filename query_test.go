@@ -39,6 +39,16 @@ func TestSimpleQueries(t *testing.T) {
 	if sql != "SELECT * FROM users WHERE expired<>expired2" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE expired<>expired2", sql)
 	}
+
+	sql = Q("users").Where().In("id", 1, 2, 3, 4).Sql()
+	if sql != "SELECT * FROM users WHERE id IN (1,2,3,4)" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id IN (1,2,3,4)", sql)
+	}
+
+	sql = Q("users").Where().NotIn("id", 1, 2, 3, 4).Sql()
+	if sql != "SELECT * FROM users WHERE id NOT IN (1,2,3,4)" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id NOT IN (1,2,3,4)", sql)
+	}
 }
 
 func TestQueryProjection(t *testing.T) {
