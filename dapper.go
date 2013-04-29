@@ -716,6 +716,10 @@ func (s *Session) insert(entity interface{}, tx *sql.Tx) error {
 		return err
 	}
 
+	if s.debug {
+		log.Println(sql)
+	}
+
 	// Execute SQL query and return its result
 	res, err := s.exec(tx, sql)
 	if err != nil {
@@ -807,6 +811,10 @@ func (s *Session) update(entity interface{}, tx *sql.Tx) error {
 		return err
 	}
 
+	if s.debug {
+		log.Println(sql)
+	}
+
 	if tx == nil {
 		// Execute SQL query and return its result
 		_, err = s.db.Exec(sql)
@@ -894,6 +902,10 @@ func (s *Session) delete(entity interface{}, tx *sql.Tx) error {
 	sql, err := s.generateDeleteSql(ti, entity)
 	if err != nil {
 		return err
+	}
+
+	if s.debug {
+		log.Println(sql)
 	}
 
 	if tx == nil {
