@@ -33,7 +33,7 @@ var (
 var quotetests = []QuoteTest{
 	{"NULL", nil, "NULL"},
 	{"Empty string", "", "''"},
-	{"Double-quotes", "Mc'Allister", "'Mc''Allister'"},
+	{"Double-quotes", "Mc'Allister", "'Mc\\'Allister'"},
 	{"ptr to string", &oliver, "'Oliver'"},
 	{"int(1)", int(1), "1"},
 	{"int16(1)", int16(1), "1"},

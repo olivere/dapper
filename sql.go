@@ -2,10 +2,10 @@ package dapper
 
 import (
 	"fmt"
+	"github.com/ziutek/mymysql/mysql"
 	"reflect"
 	"regexp"
 	"time"
-	"github.com/ziutek/mymysql/mysql"
 )
 
 var (
@@ -118,5 +118,5 @@ func Quote(val interface{}) string {
 
 func QuoteString(s string) string {
 	q := reBackslash.ReplaceAllString(s, "\\\\")
-	return reSingleQuote.ReplaceAllString(q, "''")
+	return reSingleQuote.ReplaceAllString(q, "\\'")
 }

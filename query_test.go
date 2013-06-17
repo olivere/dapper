@@ -15,6 +15,16 @@ func TestSimpleQueries(t *testing.T) {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id=1", sql)
 	}
 
+	sql = Q("users").Where().Eq("name", "oliver").Sql()
+	if sql != "SELECT * FROM users WHERE name='oliver'" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE name='oliver'", sql)
+	}
+
+	sql = Q("users").Where().Eq("name", "mc'alister").Sql()
+	if sql != "SELECT * FROM users WHERE name='mc\\'alister'" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE name='mc\\'alister'", sql)
+	}
+
 	sql = Q("users").Where().Eq("expired", nil).Sql()
 	if sql != "SELECT * FROM users WHERE expired IS NULL" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE expired IS NULL", sql)
@@ -65,29 +75,6 @@ func TestQueryProjection(t *testing.T) {
 		Sql()
 	if sql != "SELECT users.name FROM users WHERE users.id=2" {
 		t.Errorf("expected %v, got %v", "SELECT users.name FROM users WHERE users.id=2", sql)
-	}
-}
-
-func TestQueryWhereEq(t *testing.T) {
-	sql := Q("users").
-		Where().Eq("users.name", "oliver").
-		Sql()
-	if sql != "SELECT * FROM users WHERE users.name='oliver'" {
-		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE users.name='oliver'", sql)
-	}
-
-	sql = Q("users").
-		Where().Eq("users.id", nil).
-		Sql()
-	if sql != "SELECT * FROM users WHERE users.id IS NULL" {
-		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE users.id IS NULL", sql)
-	}
-
-	sql = Q("users").
-		Where().Eq("users.id", 2).
-		Sql()
-	if sql != "SELECT * FROM users WHERE users.id=2" {
-		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE users.id=2", sql)
 	}
 }
 
