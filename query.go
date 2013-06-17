@@ -6,6 +6,9 @@ import (
 	"reflect"
 )
 
+// SafeSqlString represents an unescape SQL string
+type SafeSqlString string
+
 // Represents a SQL query on a SQL database.
 
 type Query struct {
@@ -21,8 +24,7 @@ func Q(table string) *Query {
 	q := &Query{}
 	t := NewTableClause(q, table)
 	q.t = t
-	q.columns = make([]string, 1)
-	q.columns[0] = "*"
+	q.columns = make([]string, 0)
 	q.joins = make([]*joinClause, 0)
 	q.orders = make([]*orderClause, 0)
 	return q
@@ -33,9 +35,17 @@ func (q *Query) Alias(alias string) *Query {
 	return q
 }
 
-func (q *Query) Project(columns ...string) *Query {
-	q.columns = make([]string, 0)
-	q.columns = append(q.columns, columns...)
+func (q *Query) Project(columns ...interface{}) *Query {
+	for _, column := range columns {
+		switch t := column.(type) {
+		default:
+			q.columns = append(q.columns, QuoteString(t.(string)))
+		case SafeSqlString:
+			q.columns = append(q.columns, string(t))
+		case *Query:
+			q.columns = append(q.columns, t.Sql())
+		}
+	}
 	return q
 }
 
@@ -110,11 +120,15 @@ func (q *Query) Query() *Query {
 func (q *Query) Sql() string {
 	var b bytes.Buffer
 	b.WriteString("SELECT ")
-	for i, column := range q.columns {
-		if i > 0 {
-			b.WriteString(",")
+	if len(q.columns) == 0 {
+		b.WriteString("*")
+	} else {
+		for i, column := range q.columns {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString(column)
 		}
-		b.WriteString(QuoteString(column))
 	}
 	b.WriteString(" FROM ")
 	b.WriteString(q.t.SubSql())
@@ -169,7 +183,7 @@ func (t *tableClause) Alias(alias string) *tableClause {
 	return t
 }
 
-func (t *tableClause) Project(columns ...string) *Query {
+func (t *tableClause) Project(columns ...interface{}) *Query {
 	return t.q.Project(columns...)
 }
 
@@ -232,7 +246,7 @@ func (j *joinClause) Join(table string) *joinClause {
 	return j.q.Join(table)
 }
 
-func (j *joinClause) Project(columns ...string) *Query {
+func (j *joinClause) Project(columns ...interface{}) *Query {
 	return j.q.Project(columns...)
 }
 
@@ -330,7 +344,7 @@ func (wc *whereClause) NotIn(column string, values ...interface{}) *whereClause 
 	return wc
 }
 
-func (wc *whereClause) Project(columns ...string) *Query {
+func (wc *whereClause) Project(columns ...interface{}) *Query {
 	return wc.q.Project(columns...)
 }
 
@@ -385,7 +399,12 @@ func (we whereEqual) Sql() string {
 
 func (we whereEqual) SubSql() string {
 	if we.value != nil {
-		return fmt.Sprintf("%s%s%s", we.column, "=", Quote(we.value))
+		switch t := we.value.(type) {
+		default:
+			return fmt.Sprintf("%s%s%s", we.column, "=", Quote(t))
+		case SafeSqlString:
+			return fmt.Sprintf("%s%s%s", we.column, "=", string(t))
+		}
 	}
 	return fmt.Sprintf("%s IS NULL", we.column)
 }
@@ -420,7 +439,12 @@ func (wne whereNotEqual) Sql() string {
 
 func (wne whereNotEqual) SubSql() string {
 	if wne.value != nil {
-		return fmt.Sprintf("%s%s%s", wne.column, "<>", Quote(wne.value))
+		switch t := wne.value.(type) {
+		default:
+			return fmt.Sprintf("%s%s%s", wne.column, "<>", Quote(t))
+		case SafeSqlString:
+			return fmt.Sprintf("%s%s%s", wne.column, "<>", string(t))
+		}
 	}
 	return fmt.Sprintf("%s IS NOT NULL", wne.column)
 }
@@ -454,7 +478,12 @@ func (w whereLike) Sql() string {
 }
 
 func (w whereLike) SubSql() string {
-	return fmt.Sprintf("%s LIKE %s", w.column, Quote(w.value))
+	switch t := w.value.(type) {
+	default:
+		return fmt.Sprintf("%s LIKE %s", w.column, Quote(t))
+	case SafeSqlString:
+		return fmt.Sprintf("%s LIKE %s", w.column, string(t))
+	}
 }
 
 // A where clause of type "column NOT LIKE value"
@@ -470,7 +499,12 @@ func (w whereNotLike) Sql() string {
 }
 
 func (w whereNotLike) SubSql() string {
-	return fmt.Sprintf("%s NOT LIKE %s", w.column, Quote(w.value))
+	switch t := w.value.(type) {
+	default:
+		return fmt.Sprintf("%s NOT LIKE %s", w.column, Quote(t))
+	case SafeSqlString:
+		return fmt.Sprintf("%s NOT LIKE %s", w.column, string(t))
+	}
 }
 
 // A where clause of type "column IN (...)"
@@ -496,13 +530,25 @@ func (w whereIn) SubSql() string {
 				if j > 0 {
 					b.WriteString(",")
 				}
-				b.WriteString(Quote(inv.Index(j).Interface()))
+
+				switch t := inv.Index(j).Interface().(type) {
+				default:
+					b.WriteString(Quote(t))
+				case SafeSqlString:
+					b.WriteString(string(t))
+				}
 			}
 		} else {
 			if i > 0 {
 				b.WriteString(",")
 			}
-			b.WriteString(Quote(value))
+
+			switch t := value.(type) {
+			default:
+				b.WriteString(Quote(t))
+			case SafeSqlString:
+				b.WriteString(string(t))
+			}
 		}
 	}
 	return fmt.Sprintf("%s IN (%s)", w.column, b.String())
@@ -531,13 +577,25 @@ func (w whereNotIn) SubSql() string {
 				if j > 0 {
 					b.WriteString(",")
 				}
-				b.WriteString(Quote(inv.Index(j).Interface()))
+
+				switch t := inv.Index(j).Interface().(type) {
+				default:
+					b.WriteString(Quote(t))
+				case SafeSqlString:
+					b.WriteString(string(t))
+				}
 			}
 		} else {
 			if i > 0 {
 				b.WriteString(",")
 			}
-			b.WriteString(Quote(value))
+
+			switch t := value.(type) {
+			default:
+				b.WriteString(Quote(t))
+			case SafeSqlString:
+				b.WriteString(string(t))
+			}
 		}
 	}
 	return fmt.Sprintf("%s NOT IN (%s)", w.column, b.String())

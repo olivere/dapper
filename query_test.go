@@ -61,6 +61,41 @@ func TestSimpleQueries(t *testing.T) {
 	}
 }
 
+func TestSubQueries(t *testing.T) {
+	// Subquery with numerical columns
+	subQ := Q("tweets").
+		Project("count(tweets.id)").
+		Where().
+		EqCol("tweets.user_id", "users.user_id").
+		Eq("tweets.retweets", 25).
+		Query()
+	sql := Q("users").
+		Project("users.*, " +
+		"(" + subQ.Sql() + ") num_tweets").
+		Sql()
+	expected := "SELECT users.*, (SELECT count(tweets.id) FROM tweets WHERE tweets.user_id=users.user_id AND tweets.retweets=25) num_tweets FROM users"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+
+	// Subquery with string columns
+	subQ = Q("tweets").
+		Project("count(tweets.id)").
+		Where().
+		EqCol("tweets.user_id", "users.user_id").
+		Eq("tweets.message", "Hello").
+		Query()
+
+	t.Logf("subQ: %s", subQ.Sql())
+
+	sql = Q("users").
+		Project("users.*", SafeSqlString("("+subQ.Sql()+") num_tweets")).Sql()
+	expected = "SELECT users.*,(SELECT count(tweets.id) FROM tweets WHERE tweets.user_id=users.user_id AND tweets.message='Hello') num_tweets FROM users"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
 func TestQueryProjection(t *testing.T) {
 	sql := Q("users").
 		Project("name").
@@ -75,6 +110,17 @@ func TestQueryProjection(t *testing.T) {
 		Sql()
 	if sql != "SELECT users.name FROM users WHERE users.id=2" {
 		t.Errorf("expected %v, got %v", "SELECT users.name FROM users WHERE users.id=2", sql)
+	}
+}
+
+func TestSafeSqlString(t *testing.T) {
+	safeSql := SafeSqlString("don't escape me")
+	sql := Q("users").
+		Project("name", safeSql).
+		Sql()
+	expected := "SELECT name,don't escape me FROM users"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
 	}
 }
 
@@ -181,12 +227,89 @@ func TestComplexQuery(t *testing.T) {
 	}
 }
 
+func TestQueryEqualColumn(t *testing.T) {
+	sql := Q("tweets").
+		Where().EqCol("message", "user").
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message=user"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+func TestQueryNotEqualColumn(t *testing.T) {
+	sql := Q("tweets").
+		Where().NeCol("message", "user").
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message<>user"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+func TestQueryEqual(t *testing.T) {
+	sql := Q("tweets").
+		Where().Eq("message", "Google").
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message='Google'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+func TestQueryEqualWithSafeString(t *testing.T) {
+	sql := Q("tweets").
+		Where().Eq("message", SafeSqlString("'don't escape me'")).
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message='don't escape me'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+func TestQueryNotEqual(t *testing.T) {
+	sql := Q("tweets").
+		Where().Ne("message", "Google").
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message<>'Google'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+func TestQueryNotEqualWithSafeString(t *testing.T) {
+	sql := Q("tweets").
+		Where().Ne("message", SafeSqlString("'don't escape me'")).
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message<>'don't escape me'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
 func TestQueryLike(t *testing.T) {
 	sql := Q("tweets").
 		Where().Like("message", "%Google%").
 		Sql()
 
 	expected := "SELECT * FROM tweets WHERE message LIKE '%Google%'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+func TestQueryLikeWithSafeSqlString(t *testing.T) {
+	sql := Q("tweets").
+		Where().Like("message", SafeSqlString("'%don't escape me%'")).
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message LIKE '%don't escape me%'"
 	if sql != expected {
 		t.Errorf("expected %v, got %v", expected, sql)
 	}
@@ -203,12 +326,34 @@ func TestQueryNotLike(t *testing.T) {
 	}
 }
 
+func TestQueryNotLikeWithSafeSqlString(t *testing.T) {
+	sql := Q("tweets").
+		Where().NotLike("message", SafeSqlString("'%don't escape me%'")).
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message NOT LIKE '%don't escape me%'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
 func TestQueryInClause(t *testing.T) {
 	sql := Q("tweets").
 		Where().In("id", 1, 2).
 		Sql()
 
 	expected := "SELECT * FROM tweets WHERE id IN (1,2)"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+func TestQueryInClauseWithSafeString(t *testing.T) {
+	sql := Q("tweets").
+		Where().In("id", 1, 2, SafeSqlString("Oops")).
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE id IN (1,2,Oops)"
 	if sql != expected {
 		t.Errorf("expected %v, got %v", expected, sql)
 	}
@@ -231,6 +376,17 @@ func TestQueryNotInClause(t *testing.T) {
 		Sql()
 
 	expected := "SELECT * FROM tweets WHERE id NOT IN (1,2)"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+func TestQueryNotInClauseWithSafeString(t *testing.T) {
+	sql := Q("tweets").
+		Where().NotIn("id", 1, 2, SafeSqlString("Ooops")).
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE id NOT IN (1,2,Ooops)"
 	if sql != expected {
 		t.Errorf("expected %v, got %v", expected, sql)
 	}
