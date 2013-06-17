@@ -68,6 +68,29 @@ func TestQueryProjection(t *testing.T) {
 	}
 }
 
+func TestQueryWhereEq(t *testing.T) {
+	sql := Q("users").
+		Where().Eq("users.name", "oliver").
+		Sql()
+	if sql != "SELECT * FROM users WHERE users.name='oliver'" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE users.name='oliver'", sql)
+	}
+
+	sql = Q("users").
+		Where().Eq("users.id", nil).
+		Sql()
+	if sql != "SELECT * FROM users WHERE users.id IS NULL" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE users.id IS NULL", sql)
+	}
+
+	sql = Q("users").
+		Where().Eq("users.id", 2).
+		Sql()
+	if sql != "SELECT * FROM users WHERE users.id=2" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE users.id=2", sql)
+	}
+}
+
 func TestChainedQueries(t *testing.T) {
 	q := Q("users").Where().Eq("id", 1).Query()
 	q = q.Where().Eq("name", "Oliver").Query()
