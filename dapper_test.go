@@ -9,7 +9,6 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/ziutek/mymysql/godrv"
-	"github.com/ziutek/mymysql/mysql"
 )
 
 const (
@@ -25,25 +24,23 @@ var (
 // ---- Test tables ----------------------------------------------------------
 
 type cruddy struct {
-	Id          int64       `dapper:"id,primarykey,autoincrement,table=cruddy"`
-	Int         int         `dapper:"c_int"`
-	Int32       int32       `dapper:"c_int32"`
-	Int64       int64       `dapper:"c_int64"`
-	Uint        uint        `dapper:"c_uint"`
-	Uint32      uint32      `dapper:"c_uint32"`
-	Uint64      uint64      `dapper:"c_uint64"`
-	Float32     float32     `dapper:"c_float32"`
-	Float64     float64     `dapper:"c_float64"`
-	Decimal     float64     `dapper:"c_decimal"`
-	Date        mysql.Date  `dapper:"c_date"`
-	DatePtr     *mysql.Date `dapper:"c_date_ptr"`
-	DateTime    time.Time   `dapper:"c_datetime"`
-	DateTimePtr *time.Time  `dapper:"c_datetime_ptr"`
-	Timestamp   *time.Time  `dapper:"c_timestamp"`
-	Bool        bool        `dapper:"c_bool"`
-	Char        string      `dapper:"c_char"`
-	Varchar     string      `dapper:"c_varchar"`
-	Text        string      `dapper:"c_text"`
+	Id          int64      `dapper:"id,primarykey,autoincrement,table=cruddy"`
+	Int         int        `dapper:"c_int"`
+	Int32       int32      `dapper:"c_int32"`
+	Int64       int64      `dapper:"c_int64"`
+	Uint        uint       `dapper:"c_uint"`
+	Uint32      uint32     `dapper:"c_uint32"`
+	Uint64      uint64     `dapper:"c_uint64"`
+	Float32     float32    `dapper:"c_float32"`
+	Float64     float64    `dapper:"c_float64"`
+	Decimal     float64    `dapper:"c_decimal"`
+	DateTime    time.Time  `dapper:"c_datetime"`
+	DateTimePtr *time.Time `dapper:"c_datetime_ptr"`
+	Timestamp   *time.Time `dapper:"c_timestamp"`
+	Bool        bool       `dapper:"c_bool"`
+	Char        string     `dapper:"c_char"`
+	Varchar     string     `dapper:"c_varchar"`
+	Text        string     `dapper:"c_text"`
 }
 
 type tweet struct {
@@ -555,7 +552,6 @@ func TestCRUDOnMymysqlDriver(t *testing.T) {
 
 	session := New(db)
 	now := time.Now()
-	dt, _ := mysql.ParseDate("2013-01-02")
 	in := cruddy{
 		Int:         1,
 		Int32:       int32(2),
@@ -566,8 +562,6 @@ func TestCRUDOnMymysqlDriver(t *testing.T) {
 		Float32:     float32(7.1),
 		Float64:     float64(8.2),
 		Decimal:     float64(9.33),
-		Date:        dt,
-		DatePtr:     &dt,
 		DateTime:    now,
 		DateTimePtr: &now,
 		Timestamp:   nil,

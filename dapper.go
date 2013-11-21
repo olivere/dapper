@@ -63,7 +63,7 @@ func (f *finder) Debug(debug bool) *finder {
 }
 
 // Include adds associations to be loaded with the results.
-// They need to be marked with 
+// They need to be marked with
 // `dapper:"oneToMany=<table_name>.<foreign_key>"` or
 // `dapper:"oneToOne=<table_name>.<foreign_key>"`
 // in the table setup.
@@ -106,7 +106,7 @@ func (r *getRequest) Debug(debug bool) *getRequest {
 }
 
 // Include adds associations to be loaded in addition to the model.
-// They need to be marked with 
+// They need to be marked with
 // `dapper:"oneToMany=<table_name>.<foreign_key>"` or
 // `dapper:"oneToOne=<table_name>.<foreign_key>"`
 // in the table setup.
@@ -202,7 +202,7 @@ func (r *getRequest) Do(result interface{}) error {
 // Single returns the first result of the SQL query in result.
 //
 // If no rows are found, sql.ErrNoRows is returned (see sql.QueryRow).
-// 
+//
 // Example:
 // param := UserByIdQuery{Id: 42}
 // var result User{}
@@ -609,12 +609,12 @@ func (q *finder) All(result interface{}) error {
 
 // ---- Scalar --------------------------------------------------------------
 
-// Scalar runs the finder query and returns the value of the first column 
+// Scalar runs the finder query and returns the value of the first column
 // of the first row. This is useful for queries such as counting.
-// 
+//
 // The result parameter must be a pointer to a matching value.
 // If no rows are found, sql.ErrNoRows is returned.
-// 
+//
 // Example:
 // param := UserByIdQuery{Id: 42}
 // var count int64
@@ -670,7 +670,7 @@ func (q *finder) Scalar(result interface{}) error {
 
 // Count returns the count of the query as an int64.
 // If the result is not an int64, it returns ErrWrongType.
-// 
+//
 // Example:
 // count, err := session.Count("select count(*) from users", nil)
 func (s *Session) Count(sqlQuery string, param interface{}) (int64, error) {
@@ -760,7 +760,7 @@ func (s *Session) generateInsertSql(ti *typeInfo, entity interface{}) (string, e
 	for _, cname := range ti.ColumnNames {
 		if fi, found := ti.ColumnInfos[cname]; found {
 			if !fi.IsAutoIncrement || fi.IsTransient {
-				cnames = append(cnames, cname)
+				cnames = append(cnames, EscapeColumnName(cname))
 
 				field := entityv.Elem().FieldByName(fi.FieldName)
 				value := field.Interface()
@@ -771,7 +771,7 @@ func (s *Session) generateInsertSql(ti *typeInfo, entity interface{}) (string, e
 	}
 
 	return fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
-		QuoteString(ti.TableName),
+		EscapeTableName(ti.TableName),
 		strings.Join(cnames, ", "),
 		strings.Join(cvals, ", ")), nil
 }
@@ -857,16 +857,16 @@ func (s *Session) generateUpdateSql(ti *typeInfo, entity interface{}) (string, e
 				field = entityv.FieldByName(fi.FieldName)
 				value := field.Interface()
 				quoted := Quote(value)
-				pair := fmt.Sprintf("%s=%s", cname, quoted)
+				pair := fmt.Sprintf("%s=%s", EscapeColumnName(cname), quoted)
 				pairs = append(pairs, pair)
 			}
 		}
 	}
 
 	return fmt.Sprintf("UPDATE %s SET %s WHERE %s=%s",
-		QuoteString(ti.TableName),
+		EscapeTableName(ti.TableName),
 		strings.Join(pairs, ", "),
-		pk.ColumnName,
+		EscapeColumnName(pk.ColumnName),
 		Quote(pkval)), nil
 }
 
@@ -943,8 +943,8 @@ func (s *Session) generateDeleteSql(ti *typeInfo, entity interface{}) (string, e
 	pkval := field.Interface()
 
 	return fmt.Sprintf("DELETE FROM %s WHERE %s=%s",
-		QuoteString(ti.TableName),
-		pk.ColumnName,
+		EscapeTableName(ti.TableName),
+		EscapeColumnName(pk.ColumnName),
 		Quote(pkval)), nil
 }
 

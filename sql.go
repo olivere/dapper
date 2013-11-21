@@ -2,7 +2,6 @@ package dapper
 
 import (
 	"fmt"
-	"github.com/ziutek/mymysql/mysql"
 	"reflect"
 	"regexp"
 	"time"
@@ -103,14 +102,6 @@ func Quote(val interface{}) string {
 			return fmt.Sprintf("'%s'", QuoteString((*t).Format("2006-01-02 15:04:05")))
 		}
 		return "NULL"
-	case mysql.Date:
-		return fmt.Sprintf("'%s'", QuoteString(data.String()))
-	case *mysql.Date:
-		if data != nil {
-			t := val.(*mysql.Date)
-			return fmt.Sprintf("'%s'", QuoteString((*t).String()))
-		}
-		return "NULL"
 	}
 	panic(fmt.Sprintf("SQL quoting for type %s is not supported", reflect.TypeOf(val)))
 	return ""
@@ -119,4 +110,12 @@ func Quote(val interface{}) string {
 func QuoteString(s string) string {
 	q := reBackslash.ReplaceAllString(s, "\\\\")
 	return reSingleQuote.ReplaceAllString(q, "\\'")
+}
+
+func EscapeColumnName(s string) string {
+	return fmt.Sprintf("`%s`", s)
+}
+
+func EscapeTableName(s string) string {
+	return s
 }
