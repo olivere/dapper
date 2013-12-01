@@ -86,7 +86,7 @@ func TestSubQueries(t *testing.T) {
 		Eq("tweets.message", "Hello").
 		Query()
 
-	t.Logf("subQ: %s", subQ.Sql())
+	//t.Logf("subQ: %s", subQ.Sql())
 
 	sql = Q("users").
 		Project("users.*", SafeSqlString("("+subQ.Sql()+") num_tweets")).Sql()

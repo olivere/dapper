@@ -1,6 +1,7 @@
 package dapper
 
 import (
+	"bytes"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -16,8 +17,9 @@ var (
 
 // Session represents an interface to a database.
 type Session struct {
-	db    *sql.DB
-	debug bool
+	db      *sql.DB
+	dialect *Dialect
+	debug   bool
 }
 
 // Finder is a type for querying the database.
@@ -32,7 +34,17 @@ type finder struct {
 
 // New creates a Session from a database connection.
 func New(db *sql.DB) *Session {
-	return &Session{db: db, debug: false}
+	return &Session{db: db, dialect: MySQL, debug: false}
+}
+
+// Dialect allows for specific SQL dialects.
+func (s *Session) Dialect(dialect *Dialect) *Session {
+	if dialect != nil {
+		s.dialect = dialect
+	} else {
+		s.dialect = MySQL
+	}
+	return s
 }
 
 // Debug enables or disables output of the SQL statements to the logger.
@@ -720,21 +732,42 @@ func (s *Session) insert(entity interface{}, tx *sql.Tx) error {
 		log.Println(sql)
 	}
 
-	// Execute SQL query and return its result
-	res, err := s.exec(tx, sql)
-	if err != nil {
-		return err
-	}
-
 	// Set last insert id if the type has an autoincrement column
-	if fi, found := ti.GetAutoIncrement(); found {
-		newId, err := res.LastInsertId()
-		if err != nil {
+	if autoIncrField, hasAutoIncrField := ti.GetAutoIncrement(); hasAutoIncrField {
+		// We have an auto_increment field which we'll fill via
+		// AUTO_INCREMENT (MySQL), AUTOINCREMENT (Sqlite3), or a sequence (psql)
+		var newId int64
+		if s.dialect.SupportsLastInsertId {
+			// We get the newId later via LastInsertId()
+			res, err := s.exec(tx, sql)
+			if err != nil {
+				return err
+			}
+			if newId, err = res.LastInsertId(); err != nil {
+				return err
+			}
+		} else {
+			if tx != nil {
+				// Query and get RETURNING value in a transaction
+				if err := tx.QueryRow(sql).Scan(&newId); err != nil {
+					return err
+				}
+			} else {
+				// Query and get RETURNING value without a transaction
+				if err := s.db.QueryRow(sql).Scan(&newId); err != nil {
+					return err
+				}
+			}
+		}
+
+		// Set autoincrement column to newly generated Id
+		field := entityv.Elem().FieldByName(autoIncrField.FieldName)
+		field.Set(reflect.ValueOf(newId))
+	} else {
+		// We don't have to care about auto-increment
+		if _, err = s.exec(tx, sql); err != nil {
 			return err
 		}
-		// Set autoincrement column to newly generated Id
-		field := entityv.Elem().FieldByName(fi.FieldName)
-		field.Set(reflect.ValueOf(newId))
 	}
 
 	return nil
@@ -757,23 +790,35 @@ func (s *Session) generateInsertSql(ti *typeInfo, entity interface{}) (string, e
 	cnames := make([]string, 0)
 	cvals := make([]string, 0)
 
+	var autoIncrField *fieldInfo
+
 	for _, cname := range ti.ColumnNames {
 		if fi, found := ti.ColumnInfos[cname]; found {
 			if !fi.IsAutoIncrement || fi.IsTransient {
-				cnames = append(cnames, EscapeColumnName(cname))
+				cnames = append(cnames, EscapeColumnName(cname, s.dialect.ColumnQuoteChar))
 
 				field := entityv.Elem().FieldByName(fi.FieldName)
 				value := field.Interface()
 				quoted := Quote(value)
 				cvals = append(cvals, quoted)
+			} else if fi.IsAutoIncrement {
+				autoIncrField = fi
 			}
 		}
 	}
 
-	return fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
-		EscapeTableName(ti.TableName),
+	var sql bytes.Buffer
+	sql.WriteString(fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
+		EscapeTableName(ti.TableName, s.dialect.TableQuoteChar),
 		strings.Join(cnames, ", "),
-		strings.Join(cvals, ", ")), nil
+		strings.Join(cvals, ", ")))
+
+	if !s.dialect.SupportsLastInsertId {
+		sql.WriteString(fmt.Sprintf(" RETURNING %s",
+			EscapeColumnName(autoIncrField.ColumnName, s.dialect.ColumnQuoteChar)))
+	}
+
+	return sql.String(), nil
 }
 
 // ---- Update --------------------------------------------------------------
@@ -857,16 +902,16 @@ func (s *Session) generateUpdateSql(ti *typeInfo, entity interface{}) (string, e
 				field = entityv.FieldByName(fi.FieldName)
 				value := field.Interface()
 				quoted := Quote(value)
-				pair := fmt.Sprintf("%s=%s", EscapeColumnName(cname), quoted)
+				pair := fmt.Sprintf("%s=%s", EscapeColumnName(cname, s.dialect.ColumnQuoteChar), quoted)
 				pairs = append(pairs, pair)
 			}
 		}
 	}
 
 	return fmt.Sprintf("UPDATE %s SET %s WHERE %s=%s",
-		EscapeTableName(ti.TableName),
+		EscapeTableName(ti.TableName, s.dialect.TableQuoteChar),
 		strings.Join(pairs, ", "),
-		EscapeColumnName(pk.ColumnName),
+		EscapeColumnName(pk.ColumnName, s.dialect.ColumnQuoteChar),
 		Quote(pkval)), nil
 }
 
@@ -943,8 +988,8 @@ func (s *Session) generateDeleteSql(ti *typeInfo, entity interface{}) (string, e
 	pkval := field.Interface()
 
 	return fmt.Sprintf("DELETE FROM %s WHERE %s=%s",
-		EscapeTableName(ti.TableName),
-		EscapeColumnName(pk.ColumnName),
+		EscapeTableName(ti.TableName, s.dialect.TableQuoteChar),
+		EscapeColumnName(pk.ColumnName, s.dialect.ColumnQuoteChar),
 		Quote(pkval)), nil
 }
 

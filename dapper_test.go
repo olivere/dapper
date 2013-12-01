@@ -9,6 +9,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 	_ "github.com/ziutek/mymysql/godrv"
 )
@@ -20,7 +21,7 @@ const (
 )
 
 var (
-	drivers = []string{"mymysql", "mysql", "sqlite3"}
+	drivers = []string{"mymysql", "mysql", "sqlite3", "postgres"}
 )
 
 // ---- Test tables ----------------------------------------------------------
@@ -153,6 +154,27 @@ func (item OrderItem) String() string {
 
 // -- Setup -----------------------------------------------------------------
 
+func setupWithSession(driver string, t *testing.T) (db *sql.DB, session *Session) {
+	db = setup(driver, t)
+	if db == nil {
+		return nil, nil
+	}
+	switch driver {
+	case "mymysql":
+		session = New(db).Dialect(MySQL)
+	case "mysql":
+		session = New(db).Dialect(MySQL)
+	case "sqlite3":
+		session = New(db).Dialect(Sqlite3)
+	case "postgres":
+		session = New(db).Dialect(PostgreSQL)
+	default:
+		t.Fatalf("unknown driver: %s", driver)
+		return nil, nil
+	}
+	return db, session
+}
+
 func setup(driver string, t *testing.T) (db *sql.DB) {
 	var err error
 	switch driver {
@@ -175,65 +197,85 @@ func setup(driver string, t *testing.T) (db *sql.DB) {
 		if err != nil {
 			t.Fatalf("error connection to database: %v", err)
 		}
+	case "postgres":
+		connectionString := fmt.Sprintf("user=%s password='%s' dbname=%s sslmode=disable", testDBUser, testDBPass, testDBName)
+		db, err = sql.Open("postgres", connectionString)
+		if err != nil {
+			t.Fatalf("error connection to database: %v", err)
+		}
 	}
 	return seed(driver, t, db)
 }
 
 func seed(driver string, t *testing.T, db *sql.DB) *sql.DB {
 	// Drop tables
-	_, err := db.Exec("DROP TABLE IF EXISTS tweets")
+	suffix := ""
+	switch driver {
+	default:
+		suffix = "CASCADE"
+	case "sqlite3":
+		suffix = ""
+	}
+	_, err := db.Exec("DROP TABLE IF EXISTS tweets " + suffix)
 	if err != nil {
-		t.Fatalf("error dropping tweets table: %v", err)
+		t.Fatalf("%s: error dropping tweets table: %v", driver, err)
 	}
 
-	_, err = db.Exec("DROP TABLE IF EXISTS users")
+	_, err = db.Exec("DROP TABLE IF EXISTS users " + suffix)
 	if err != nil {
-		t.Fatalf("error dropping users table: %v", err)
+		t.Fatalf("%s: error dropping users table: %v", driver, err)
 	}
 
-	_, err = db.Exec("DROP TABLE IF EXISTS cruddy")
+	_, err = db.Exec("DROP TABLE IF EXISTS cruddy " + suffix)
 	if err != nil {
-		t.Fatalf("error dropping cruddy table: %v", err)
+		t.Fatalf("%s: error dropping cruddy table: %v", driver, err)
 	}
 
-	_, err = db.Exec("DROP TABLE IF EXISTS order_items")
+	_, err = db.Exec("DROP TABLE IF EXISTS order_items " + suffix)
 	if err != nil {
-		t.Fatalf("error dropping order_items table: %v", err)
+		t.Fatalf("%s: error dropping order_items table: %v", driver, err)
 	}
 
-	_, err = db.Exec("DROP TABLE IF EXISTS orders")
+	_, err = db.Exec("DROP TABLE IF EXISTS orders " + suffix)
 	if err != nil {
-		t.Fatalf("error dropping orders table: %v", err)
+		t.Fatalf("%s: error dropping orders table: %v", driver, err)
 	}
 
 	// Create tables
-	autoinc := "AUTO_INCREMENT"
-	if driver == "sqlite3" {
-		autoinc = "AUTOINCREMENT"
-	}
-	timestampCol := "timestamp NOT NULL " +
-		"DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
-	if driver == "sqlite3" {
-		timestampCol = "datetime NOT NULL " +
-			"DEFAULT CURRENT_TIMESTAMP"
+	pkCol := ""
+	tsCol := ""
+	dateTimeType := ""
+	switch driver {
+	default:
+		pkCol = "int(11) not null primary key AUTO_INCREMENT"
+		tsCol = "timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+		dateTimeType = "datetime"
+	case "sqlite3":
+		pkCol = "integer not null primary key AUTOINCREMENT"
+		tsCol = "datetime NOT NULL DEFAULT CURRENT_TIMESTAMP"
+		dateTimeType = "datetime"
+	case "postgres":
+		pkCol = "serial not null primary key"
+		tsCol = "timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP"
+		dateTimeType = "timestamp"
 	}
 	_, err = db.Exec(`
 CREATE TABLE cruddy (
-    id integer not null primary key ` + autoinc + `,
-		c_int integer,
-		c_int32 integer,
-		c_int64 integer,
-		c_uint  integer,
-		c_uint32 integer,
-		c_uint64 integer,
+    id ` + pkCol + `,
+		c_int int,
+		c_int32 int,
+		c_int64 int,
+		c_uint  int,
+		c_uint32 int,
+		c_uint64 int,
 		c_float32 float,
 		c_float64 float,
 		c_decimal decimal(19,5),
 		c_date date,
 		c_date_ptr date,
-		c_datetime datetime,
-		c_datetime_ptr datetime,
-		c_timestamp ` + timestampCol + `,
+		c_datetime ` + dateTimeType + `,
+		c_datetime_ptr ` + dateTimeType + `,
+		c_timestamp ` + tsCol + `,
 		c_bool bool,
 		c_char char(3),
 		c_varchar varchar(20),
@@ -245,10 +287,10 @@ CREATE TABLE cruddy (
 
 	_, err = db.Exec(`
 CREATE TABLE users (
-        id integer not null primary key ` + autoinc + `,
+        id ` + pkCol + `,
         name varchar(100) not null,
         karma decimal(19,5),
-        suspended tinyint(1) default '0'
+        suspended smallint default '0'
 )`)
 	if err != nil {
 		t.Fatalf("error creating users table: %v", err)
@@ -256,10 +298,10 @@ CREATE TABLE users (
 
 	_, err = db.Exec(`
 CREATE TABLE tweets (
-        id integer not null primary key  ` + autoinc + `,
-        user_id integer not null,
+        id ` + pkCol + `,
+        user_id int not null,
         message text,
-        retweets integer,
+        retweets int,
         created timestamp not null default current_timestamp,
         foreign key (user_id) references users (id) on delete cascade
 )`)
@@ -269,7 +311,7 @@ CREATE TABLE tweets (
 
 	_, err = db.Exec(`
 CREATE TABLE orders (
-        id integer not null primary key ` + autoinc + `,
+        id ` + pkCol + `,
         ref_id varchar(100) not null
 )`)
 	if err != nil {
@@ -278,8 +320,8 @@ CREATE TABLE orders (
 
 	_, err = db.Exec(`
 CREATE TABLE order_items (
-        id integer not null primary key ` + autoinc + `,
-        order_id integer not null,
+        id ` + pkCol + `,
+        order_id int not null,
         name varchar(100) not null,
         price decimal(15,3) not null,
         qty decimal(10,3) not null,
@@ -290,11 +332,11 @@ CREATE TABLE order_items (
 	}
 
 	// Insert seed data
-	_, err = db.Exec("INSERT INTO users (id,name,karma,suspended) VALUES (1, 'Oliver', 42.13, 0)")
+	_, err = db.Exec("INSERT INTO users (name,karma,suspended) VALUES ('Oliver', 42.13, 0)")
 	if err != nil {
 		t.Fatalf("error inserting user: %v", err)
 	}
-	_, err = db.Exec("INSERT INTO users (id,name,karma,suspended) VALUES (2, 'Sandra', 57.19, 1)")
+	_, err = db.Exec("INSERT INTO users (name,karma,suspended) VALUES ('Sandra', 57.19, 1)")
 	if err != nil {
 		t.Fatalf("error inserting user: %v", err)
 	}
@@ -613,10 +655,9 @@ func TestCRUDOnMymysqlDriver(t *testing.T) {
 
 func TestSingle(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		in := user{Id: 1}
 		var out user
 		err := session.Find("select * from users where id=:Id", in).Single(&out)
@@ -642,10 +683,9 @@ func TestSingle(t *testing.T) {
 
 func TestSingleWithoutDataReturnsErrNoRows(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		in := user{Id: 42}
 		var out user
 		err := session.Find("select * from users where id=:Id", in).Single(&out)
@@ -660,10 +700,9 @@ func TestSingleWithoutDataReturnsErrNoRows(t *testing.T) {
 
 func TestSingleIgnoresMissingColumns(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		qbe := Order{Id: 1}
 		var out Order
 
@@ -679,10 +718,9 @@ func TestSingleIgnoresMissingColumns(t *testing.T) {
 
 func TestSingleIgnoresAssociations(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		qbe := Order{Id: 1}
 		var out Order
 
@@ -698,10 +736,8 @@ func TestSingleIgnoresAssociations(t *testing.T) {
 
 func TestSingleWithProjection(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
-
-		session := New(db)
 
 		in := user{Id: 1}
 		var out user
@@ -727,10 +763,9 @@ func TestSingleWithProjection(t *testing.T) {
 
 func TestSingleWithIncludes(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var order Order
 
 		err := session.
@@ -761,10 +796,9 @@ func TestSingleWithIncludes(t *testing.T) {
 
 func TestAll(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var results []user
 
 		err := session.Find("select * from users order by id", nil).All(&results)
@@ -790,10 +824,9 @@ func TestAll(t *testing.T) {
 
 func TestAllWithPtrToModel(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var results []*user
 
 		err := session.Find("select * from users order by id", nil).All(&results)
@@ -819,10 +852,9 @@ func TestAllWithPtrToModel(t *testing.T) {
 
 func TestAllWithProjections(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var results []user
 
 		err := session.Find("select id,name from users order by name", nil).All(&results)
@@ -850,10 +882,9 @@ func TestAllWithProjections(t *testing.T) {
 
 func TestAllIgnoresMissingColumns(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var results []userWithMissingColumns
 
 		err := session.Find("select * from users order by name", nil).All(&results)
@@ -877,10 +908,9 @@ func TestAllIgnoresMissingColumns(t *testing.T) {
 
 func TestAllIgnoresAssociations(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var results []Order
 
 		err := session.Find("select * from orders", nil).All(&results)
@@ -895,10 +925,9 @@ func TestAllIgnoresAssociations(t *testing.T) {
 
 func TestAllWithOneToManyIncludes(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var orders []*Order
 
 		err := session.
@@ -933,10 +962,9 @@ func TestAllWithOneToManyIncludes(t *testing.T) {
 
 func TestAllWithOneToOneIncludes(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var items []*OrderItem
 
 		err := session.
@@ -965,10 +993,9 @@ func TestAllWithOneToOneIncludes(t *testing.T) {
 
 func TestScalarWithInt32(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var count int
 
 		err := session.Find("select id from users where id=1", nil).Scalar(&count)
@@ -983,10 +1010,9 @@ func TestScalarWithInt32(t *testing.T) {
 
 func TestScalarWithFloat(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var karma float32
 
 		err := session.Find("select karma from users where id=1", nil).Scalar(&karma)
@@ -1001,10 +1027,9 @@ func TestScalarWithFloat(t *testing.T) {
 
 func TestScalarWithString(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var name string
 
 		err := session.Find("select name from users where id=1", nil).Scalar(&name)
@@ -1019,10 +1044,9 @@ func TestScalarWithString(t *testing.T) {
 
 func TestScalarWithoutDataReturnsErrNoRows(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var name string
 
 		err := session.Find("select name from users where id=42", nil).Scalar(&name)
@@ -1039,12 +1063,10 @@ func TestScalarWithoutDataReturnsErrNoRows(t *testing.T) {
 
 func TestCount(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
-
-		count, err := session.Count("select count(*) from users order by name", nil)
+		count, err := session.Count("select count(*) from users", nil)
 		if err != nil {
 			t.Fatalf("driver %s: error on Query: %v", driver, err)
 		}
@@ -1056,10 +1078,8 @@ func TestCount(t *testing.T) {
 
 func TestCountWithQueryParams(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
-
-		session := New(db)
 
 		qbe := struct{ Id int64 }{1}
 
@@ -1075,10 +1095,8 @@ func TestCountWithQueryParams(t *testing.T) {
 
 func TestCountWithWrongType(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
-
-		session := New(db)
 
 		_, err := session.Count("select name from users order by name limit 1", nil)
 		if err == nil {
@@ -1091,10 +1109,9 @@ func TestCountWithWrongType(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var out Order
 		err := session.Get(1).Do(&out)
 		if err != nil {
@@ -1111,10 +1128,9 @@ func TestGet(t *testing.T) {
 
 func TestGetWithNoSuchRow(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var out Order
 		err := session.Get(987654321).Do(&out)
 		if err != sql.ErrNoRows {
@@ -1125,10 +1141,9 @@ func TestGetWithNoSuchRow(t *testing.T) {
 
 func TestGetWithIncludeOfOneToMany(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var out Order
 		err := session.Get(1).Include("Items").Do(&out)
 		if err != nil {
@@ -1153,10 +1168,9 @@ func TestGetWithIncludeOfOneToMany(t *testing.T) {
 
 func TestGetWithIncludeOfOneToOne(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
-		session := New(db)
 		var out OrderItem
 		err := session.Get(2).Include("Order").Do(&out)
 		if err != nil {
@@ -1181,10 +1195,8 @@ func TestGetWithIncludeOfOneToOne(t *testing.T) {
 
 func TestInsert(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
-
-		session := New(db)
 
 		var oldCount int64
 		row := db.QueryRow("select count(*) from users")
@@ -1199,10 +1211,10 @@ func TestInsert(t *testing.T) {
 
 		err := session.Insert(u)
 		if err != nil {
-			t.Fatalf("error on Insert: %v", err)
+			t.Fatalf("%s: error on Insert: %v", driver, err)
 		}
 		if u.Id <= 0 {
-			t.Errorf("expected Id to be > 0, got %d", u.Id)
+			t.Errorf("%s: expected Id to be > 0, got %d", driver, u.Id)
 		}
 
 		var newCount int64
@@ -1210,17 +1222,15 @@ func TestInsert(t *testing.T) {
 		row.Scan(&newCount)
 
 		if newCount != oldCount+1 {
-			t.Errorf("expected users count to be %d, got %d", oldCount+1, newCount)
+			t.Errorf("%s: expected users count to be %d, got %d", driver, oldCount+1, newCount)
 		}
 	}
 }
 
 func TestInsertWithoutTableNameTagFails(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
-
-		session := New(db)
 
 		k := float64(42.3)
 		u := &userWithoutTableNameTag{
@@ -1238,10 +1248,8 @@ func TestInsertWithoutTableNameTagFails(t *testing.T) {
 
 func TestInsertTx(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
-
-		session := New(db)
 
 		var oldCount int64
 		row := db.QueryRow("select count(*) from users")
@@ -1263,9 +1271,11 @@ func TestInsertTx(t *testing.T) {
 		// Insert
 		err = session.InsertTx(tx, u)
 		if err != nil {
+			tx.Rollback()
 			t.Fatalf("error on InsertTx: %v", err)
 		}
 		if u.Id <= 0 {
+			tx.Rollback()
 			t.Errorf("expected Id to be > 0, got %d", u.Id)
 		}
 
@@ -1287,10 +1297,8 @@ func TestInsertTx(t *testing.T) {
 
 func TestInsertTxWithRollback(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
-
-		session := New(db)
 
 		var oldCount int64
 		row := db.QueryRow("select count(*) from users")
@@ -1312,9 +1320,11 @@ func TestInsertTxWithRollback(t *testing.T) {
 		// Insert
 		err = session.InsertTx(tx, u)
 		if err != nil {
+			tx.Rollback()
 			t.Fatalf("error on InsertTx: %v", err)
 		}
 		if u.Id <= 0 {
+			tx.Rollback()
 			t.Errorf("expected Id to be > 0, got %d", u.Id)
 		}
 
@@ -1338,7 +1348,7 @@ func TestInsertTxWithRollback(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
 		// Count users
@@ -1347,7 +1357,6 @@ func TestUpdate(t *testing.T) {
 		row.Scan(&oldCount)
 
 		// Retrieve user
-		session := New(db)
 		var u user
 		err := session.Find("select * from users where id=1", nil).Single(&u)
 		if err != nil {
@@ -1383,7 +1392,7 @@ func TestUpdate(t *testing.T) {
 
 func TestUpdateWithPtrType(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
 		// Count users
@@ -1392,7 +1401,6 @@ func TestUpdateWithPtrType(t *testing.T) {
 		row.Scan(&oldCount)
 
 		// Retrieve user
-		session := New(db)
 		var u user
 		err := session.Find("select * from users where id=1", nil).Single(&u)
 		if err != nil {
@@ -1428,11 +1436,10 @@ func TestUpdateWithPtrType(t *testing.T) {
 
 func TestUpdateWithoutPrimaryKeyTagFails(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
 		// Retrieve user
-		session := New(db)
 		var u userWithoutPrimaryKeyTag
 		err := session.Find("select * from users where id=1", nil).Single(&u)
 
@@ -1447,7 +1454,7 @@ func TestUpdateWithoutPrimaryKeyTagFails(t *testing.T) {
 
 func TestUpdateTx(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
 		// Count users
@@ -1456,7 +1463,6 @@ func TestUpdateTx(t *testing.T) {
 		row.Scan(&oldCount)
 
 		// Retrieve user
-		session := New(db)
 		var u user
 		err := session.Find("select * from users where id=1", nil).Single(&u)
 		if err != nil {
@@ -1504,7 +1510,7 @@ func TestUpdateTx(t *testing.T) {
 
 func TestUpdateTxRollback(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
 		// Count users
@@ -1513,7 +1519,6 @@ func TestUpdateTxRollback(t *testing.T) {
 		row.Scan(&oldCount)
 
 		// Retrieve user
-		session := New(db)
 		var u user
 		err := session.Find("select * from users where id=1", nil).Single(&u)
 		if err != nil {
@@ -1563,7 +1568,7 @@ func TestUpdateTxRollback(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
 		// Count users
@@ -1572,7 +1577,6 @@ func TestDelete(t *testing.T) {
 		row.Scan(&oldCount)
 
 		// Retrieve user
-		session := New(db)
 		var u user
 		err := session.Find("select * from users where id=1", nil).Single(&u)
 		if err != nil {
@@ -1598,7 +1602,7 @@ func TestDelete(t *testing.T) {
 
 func TestDeleteWithPtrType(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
 		// Count users
@@ -1607,7 +1611,6 @@ func TestDeleteWithPtrType(t *testing.T) {
 		row.Scan(&oldCount)
 
 		// Retrieve user
-		session := New(db)
 		var u user
 		err := session.Find("select * from users where id=1", nil).Single(&u)
 		if err != nil {
@@ -1633,7 +1636,7 @@ func TestDeleteWithPtrType(t *testing.T) {
 
 func TestDeleteTx(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
 		// Count users
@@ -1642,7 +1645,6 @@ func TestDeleteTx(t *testing.T) {
 		row.Scan(&oldCount)
 
 		// Retrieve user
-		session := New(db)
 		var u user
 		err := session.Find("select * from users where id=1", nil).Single(&u)
 		if err != nil {
@@ -1680,7 +1682,7 @@ func TestDeleteTx(t *testing.T) {
 
 func TestDeleteTxRollback(t *testing.T) {
 	for _, driver := range drivers {
-		db := setup(driver, t)
+		db, session := setupWithSession(driver, t)
 		defer db.Close()
 
 		// Count users
@@ -1689,7 +1691,6 @@ func TestDeleteTxRollback(t *testing.T) {
 		row.Scan(&oldCount)
 
 		// Retrieve user
-		session := New(db)
 		var u user
 		err := session.Find("select * from users where id=1", nil).Single(&u)
 		if err != nil {

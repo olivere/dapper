@@ -99,7 +99,7 @@ func TestEscapeColumnName(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := EscapeColumnName(test.Input)
+		got := EscapeColumnName(test.Input, "`")
 		if got != test.Output {
 			t.Errorf("expected %v, got %v", test.Output, got)
 		}
