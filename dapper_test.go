@@ -3,11 +3,13 @@ package dapper
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"reflect"
 	"testing"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/mattn/go-sqlite3"
 	_ "github.com/ziutek/mymysql/godrv"
 )
 
@@ -18,7 +20,7 @@ const (
 )
 
 var (
-	drivers = []string{"mymysql", "mysql"}
+	drivers = []string{"mymysql", "mysql", "sqlite3"}
 )
 
 // ---- Test tables ----------------------------------------------------------
@@ -166,11 +168,18 @@ func setup(driver string, t *testing.T) (db *sql.DB) {
 		if err != nil {
 			t.Fatalf("error connection to database: %v", err)
 		}
+	case "sqlite3":
+		os.Remove("./" + testDBName + ".db")
+		connectionString := fmt.Sprintf("./%s.db", testDBName)
+		db, err = sql.Open("sqlite3", connectionString)
+		if err != nil {
+			t.Fatalf("error connection to database: %v", err)
+		}
 	}
-	return seed(t, db)
+	return seed(driver, t, db)
 }
 
-func seed(t *testing.T, db *sql.DB) *sql.DB {
+func seed(driver string, t *testing.T, db *sql.DB) *sql.DB {
 	// Drop tables
 	_, err := db.Exec("DROP TABLE IF EXISTS tweets")
 	if err != nil {
@@ -198,15 +207,25 @@ func seed(t *testing.T, db *sql.DB) *sql.DB {
 	}
 
 	// Create tables
+	autoinc := "AUTO_INCREMENT"
+	if driver == "sqlite3" {
+		autoinc = "AUTOINCREMENT"
+	}
+	timestampCol := "timestamp NOT NULL " +
+		"DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+	if driver == "sqlite3" {
+		timestampCol = "datetime NOT NULL " +
+			"DEFAULT CURRENT_TIMESTAMP"
+	}
 	_, err = db.Exec(`
 CREATE TABLE cruddy (
-        id int(11) not null auto_increment,
-		c_int int(11),
-		c_int32 int(11),
-		c_int64 int(11),
-		c_uint  int(11),
-		c_uint32 int(11),
-		c_uint64 int(11),
+    id integer not null primary key ` + autoinc + `,
+		c_int integer,
+		c_int32 integer,
+		c_int64 integer,
+		c_uint  integer,
+		c_uint32 integer,
+		c_uint64 integer,
 		c_float32 float,
 		c_float64 float,
 		c_decimal decimal(19,5),
@@ -214,12 +233,11 @@ CREATE TABLE cruddy (
 		c_date_ptr date,
 		c_datetime datetime,
 		c_datetime_ptr datetime,
-		c_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+		c_timestamp ` + timestampCol + `,
 		c_bool bool,
 		c_char char(3),
 		c_varchar varchar(20),
-		c_text text,
-        primary key (id)
+		c_text text
 )`)
 	if err != nil {
 		t.Fatalf("error creating cruddy table: %v", err)
@@ -227,11 +245,10 @@ CREATE TABLE cruddy (
 
 	_, err = db.Exec(`
 CREATE TABLE users (
-        id int(11) not null auto_increment,
+        id integer not null primary key ` + autoinc + `,
         name varchar(100) not null,
         karma decimal(19,5),
-        suspended tinyint(1) default '0',
-        primary key (id)
+        suspended tinyint(1) default '0'
 )`)
 	if err != nil {
 		t.Fatalf("error creating users table: %v", err)
@@ -239,12 +256,11 @@ CREATE TABLE users (
 
 	_, err = db.Exec(`
 CREATE TABLE tweets (
-        id int(11) not null auto_increment,
-        user_id int(11) not null,
+        id integer not null primary key  ` + autoinc + `,
+        user_id integer not null,
         message text,
-        retweets int,
+        retweets integer,
         created timestamp not null default current_timestamp,
-        primary key (id),
         foreign key (user_id) references users (id) on delete cascade
 )`)
 	if err != nil {
@@ -253,9 +269,8 @@ CREATE TABLE tweets (
 
 	_, err = db.Exec(`
 CREATE TABLE orders (
-        id int(11) not null auto_increment,
-        ref_id varchar(100) not null,
-        primary key (id)
+        id integer not null primary key ` + autoinc + `,
+        ref_id varchar(100) not null
 )`)
 	if err != nil {
 		t.Fatalf("error creating orders table: %v", err)
@@ -263,12 +278,11 @@ CREATE TABLE orders (
 
 	_, err = db.Exec(`
 CREATE TABLE order_items (
-        id int(11) not null auto_increment,
-        order_id int(11) not null,
+        id integer not null primary key ` + autoinc + `,
+        order_id integer not null,
         name varchar(100) not null,
         price decimal(15,3) not null,
         qty decimal(10,3) not null,
-        primary key (id),
         foreign key (order_id) references orders (id) on delete cascade
 )`)
 	if err != nil {
