@@ -88,20 +88,3 @@ func TestQuoteTime(t *testing.T) {
 		t.Errorf("&time.Time: expected %v, got %v", expected, got)
 	}
 }
-
-func TestEscapeColumnName(t *testing.T) {
-	tests := []struct {
-		Input, Output string
-	}{
-		{"Address", "`Address`"},
-		{"Index", "`Index`"},
-		{"With Space", "`With Space`"},
-	}
-
-	for _, test := range tests {
-		got := EscapeColumnName(test.Input, "`")
-		if got != test.Output {
-			t.Errorf("expected %v, got %v", test.Output, got)
-		}
-	}
-}

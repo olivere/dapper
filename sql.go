@@ -111,11 +111,3 @@ func QuoteString(s string) string {
 	q := reBackslash.ReplaceAllString(s, "\\\\")
 	return reSingleQuote.ReplaceAllString(q, "\\'")
 }
-
-func EscapeColumnName(s string, quoteChar string) string {
-	return fmt.Sprintf("%s%s%s", quoteChar, s, quoteChar)
-}
-
-func EscapeTableName(s string, quoteChar string) string {
-	return fmt.Sprintf("%s%s%s", quoteChar, s, quoteChar)
-}

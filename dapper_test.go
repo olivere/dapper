@@ -387,6 +387,45 @@ CREATE TABLE order_items (
 	return db
 }
 
+// ---- Session -------------------------------------------------------------
+
+func TestSessionDefaults(t *testing.T) {
+	db := setup("mysql", t)
+	defer db.Close()
+	session := New(db)
+
+	// Will use MySQL dialect as default
+	if session.dialect != MySQL {
+		t.Errorf("expected MySQL dialect as default, got: %v", session.dialect)
+	}
+
+	// Setting the dialect to nil will reset to MySQL dialect
+	session = session.Dialect(nil)
+	if session.dialect != MySQL {
+		t.Errorf("expected MySQL dialect as fallback, got: %v", session.dialect)
+	}
+
+	// No debug by default
+	if session.debug {
+		t.Errorf("expected no debugging by default, got: %v", session.debug)
+	}
+}
+
+func TestSessionDebuggingEnable(t *testing.T) {
+	db := setup("mysql", t)
+	defer db.Close()
+	session := New(db)
+
+	// No debug by default
+	if session.debug {
+		t.Errorf("expected no debugging by default, got: %v", session.debug)
+	}
+	session = session.Debug(true)
+	if !session.debug {
+		t.Errorf("expected debugging to be true, got: %v", session.debug)
+	}
+}
+
 // ---- Types ---------------------------------------------------------------
 
 func TestTypeCache(t *testing.T) {
@@ -792,6 +831,18 @@ func TestSingleWithIncludes(t *testing.T) {
 	}
 }
 
+func TestSingleWillErrOnNonPtrResult(t *testing.T) {
+	db := setup("mysql", t)
+	defer db.Close()
+	session := New(db)
+
+	var result user
+	err := session.Find("select * from users limit 1", nil).Single(result)
+	if err == nil {
+		t.Fatalf("expected error when using non-ptr as target, got: %v", err)
+	}
+}
+
 // ---- All -----------------------------------------------------------------
 
 func TestAll(t *testing.T) {
@@ -822,6 +873,25 @@ func TestAll(t *testing.T) {
 	}
 }
 
+func TestAllWithParams(t *testing.T) {
+	for _, driver := range drivers {
+		db, session := setupWithSession(driver, t)
+		defer db.Close()
+
+		var results []user
+
+		qbe := struct{ Karma float64 }{50.0}
+		err := session.
+			Find("select * from users where karma >= :Karma order by id", qbe).
+			All(&results)
+		if err != nil {
+			t.Fatalf("error on Query: %v", err)
+		}
+		if len(results) != 1 {
+			t.Errorf("expected len(results) == %d, got %d", 1, len(results))
+		}
+	}
+}
 func TestAllWithPtrToModel(t *testing.T) {
 	for _, driver := range drivers {
 		db, session := setupWithSession(driver, t)
@@ -986,6 +1056,30 @@ func TestAllWithOneToOneIncludes(t *testing.T) {
 				t.Errorf("expected item.OrderId == item.Order.Id, got %d != %d", item.OrderId, item.Order.Id)
 			}
 		}
+	}
+}
+
+func TestAllWillErrOnNonPtrResult(t *testing.T) {
+	db := setup("mysql", t)
+	defer db.Close()
+	session := New(db)
+
+	var results []user
+	err := session.Find("select * from users", nil).All(results)
+	if err == nil {
+		t.Fatalf("expected error when using non-ptr as target, got: %v", err)
+	}
+}
+
+func TestAllWillErrOnNonSlice(t *testing.T) {
+	db := setup("mysql", t)
+	defer db.Close()
+	session := New(db)
+
+	var results user
+	err := session.Find("select * from users", nil).All(&results)
+	if err == nil {
+		t.Fatalf("expected error when using non-ptr as target, got: %v", err)
 	}
 }
 
@@ -1188,6 +1282,18 @@ func TestGetWithIncludeOfOneToOne(t *testing.T) {
 		if out.Order.Id != out.OrderId {
 			t.Errorf("expected item.Order.Id == %d, got %d", 1, out.Order.Id)
 		}
+	}
+}
+
+func TestGetWillErrOnNonPtrResult(t *testing.T) {
+	db := setup("mysql", t)
+	defer db.Close()
+	session := New(db)
+
+	var result user
+	err := session.Get(1).Do(result)
+	if err == nil {
+		t.Fatalf("expected error when using non-ptr as target, got: %v", err)
 	}
 }
 
