@@ -4,72 +4,72 @@ import (
 	"testing"
 )
 
-func TestSimpleQueries(t *testing.T) {
-	sql := Q("users").Sql()
+func TestMySQLSimpleQueries(t *testing.T) {
+	sql := Q(MySQL, "users").Sql()
 	if sql != "SELECT * FROM users" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users", sql)
 	}
 
-	sql = Q("users").Where().Eq("id", 1).Sql()
+	sql = Q(MySQL, "users").Where().Eq("id", 1).Sql()
 	if sql != "SELECT * FROM users WHERE id=1" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id=1", sql)
 	}
 
-	sql = Q("users").Where().Eq("name", "oliver").Sql()
+	sql = Q(MySQL, "users").Where().Eq("name", "oliver").Sql()
 	if sql != "SELECT * FROM users WHERE name='oliver'" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE name='oliver'", sql)
 	}
 
-	sql = Q("users").Where().Eq("name", "mc'alister").Sql()
+	sql = Q(MySQL, "users").Where().Eq("name", "mc'alister").Sql()
 	if sql != "SELECT * FROM users WHERE name='mc\\'alister'" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE name='mc\\'alister'", sql)
 	}
 
-	sql = Q("users").Where().Eq("expired", nil).Sql()
+	sql = Q(MySQL, "users").Where().Eq("expired", nil).Sql()
 	if sql != "SELECT * FROM users WHERE expired IS NULL" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE expired IS NULL", sql)
 	}
 
-	sql = Q("users").Where().EqCol("expired", "expired2").Sql()
+	sql = Q(MySQL, "users").Where().EqCol("expired", "expired2").Sql()
 	if sql != "SELECT * FROM users WHERE expired=expired2" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE expired=expired2", sql)
 	}
 
-	sql = Q("users").Where().Ne("id", 1).Sql()
+	sql = Q(MySQL, "users").Where().Ne("id", 1).Sql()
 	if sql != "SELECT * FROM users WHERE id<>1" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id<>1", sql)
 	}
 
-	sql = Q("users").Where().Ne("expired", nil).Sql()
+	sql = Q(MySQL, "users").Where().Ne("expired", nil).Sql()
 	if sql != "SELECT * FROM users WHERE expired IS NOT NULL" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE expired IS NOT NULL", sql)
 	}
 
-	sql = Q("users").Where().NeCol("expired", "expired2").Sql()
+	sql = Q(MySQL, "users").Where().NeCol("expired", "expired2").Sql()
 	if sql != "SELECT * FROM users WHERE expired<>expired2" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE expired<>expired2", sql)
 	}
 
-	sql = Q("users").Where().In("id", 1, 2, 3, 4).Sql()
+	sql = Q(MySQL, "users").Where().In("id", 1, 2, 3, 4).Sql()
 	if sql != "SELECT * FROM users WHERE id IN (1,2,3,4)" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id IN (1,2,3,4)", sql)
 	}
 
-	sql = Q("users").Where().NotIn("id", 1, 2, 3, 4).Sql()
+	sql = Q(MySQL, "users").Where().NotIn("id", 1, 2, 3, 4).Sql()
 	if sql != "SELECT * FROM users WHERE id NOT IN (1,2,3,4)" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id NOT IN (1,2,3,4)", sql)
 	}
 }
 
-func TestSubQueries(t *testing.T) {
+func TestMySQLSubQueries(t *testing.T) {
 	// Subquery with numerical columns
-	subQ := Q("tweets").
+	subQ := Q(MySQL, "tweets").
 		Project("count(tweets.id)").
 		Where().
 		EqCol("tweets.user_id", "users.user_id").
 		Eq("tweets.retweets", 25).
 		Query()
-	sql := Q("users").
+	sql := Q(MySQL, "users").
 		Project("users.*, " +
 		"(" + subQ.Sql() + ") num_tweets").
 		Sql()
@@ -79,7 +79,7 @@ func TestSubQueries(t *testing.T) {
 	}
 
 	// Subquery with string columns
-	subQ = Q("tweets").
+	subQ = Q(MySQL, "tweets").
 		Project("count(tweets.id)").
 		Where().
 		EqCol("tweets.user_id", "users.user_id").
@@ -88,7 +88,7 @@ func TestSubQueries(t *testing.T) {
 
 	//t.Logf("subQ: %s", subQ.Sql())
 
-	sql = Q("users").
+	sql = Q(MySQL, "users").
 		Project("users.*", SafeSqlString("("+subQ.Sql()+") num_tweets")).Sql()
 	expected = "SELECT users.*,(SELECT count(tweets.id) FROM tweets WHERE tweets.user_id=users.user_id AND tweets.message='Hello') num_tweets FROM users"
 	if sql != expected {
@@ -96,15 +96,15 @@ func TestSubQueries(t *testing.T) {
 	}
 }
 
-func TestQueryProjection(t *testing.T) {
-	sql := Q("users").
+func TestMySQLQueryProjection(t *testing.T) {
+	sql := Q(MySQL, "users").
 		Project("name").
 		Sql()
 	if sql != "SELECT name FROM users" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users", sql)
 	}
 
-	sql = Q("users").
+	sql = Q(MySQL, "users").
 		Where().Eq("users.id", 2).
 		Project("users.name").
 		Sql()
@@ -113,9 +113,9 @@ func TestQueryProjection(t *testing.T) {
 	}
 }
 
-func TestSafeSqlString(t *testing.T) {
+func TestMySQLSafeSqlString(t *testing.T) {
 	safeSql := SafeSqlString("don't escape me")
-	sql := Q("users").
+	sql := Q(MySQL, "users").
 		Project("name", safeSql).
 		Sql()
 	expected := "SELECT name,don't escape me FROM users"
@@ -124,8 +124,8 @@ func TestSafeSqlString(t *testing.T) {
 	}
 }
 
-func TestChainedQueries(t *testing.T) {
-	q := Q("users").Where().Eq("id", 1).Query()
+func TestMySQLChainedQueries(t *testing.T) {
+	q := Q(MySQL, "users").Where().Eq("id", 1).Query()
 	q = q.Where().Eq("name", "Oliver").Query()
 	got := q.Sql()
 	expected := "SELECT * FROM users WHERE id=1 AND name='Oliver'"
@@ -134,32 +134,32 @@ func TestChainedQueries(t *testing.T) {
 	}
 }
 
-func TestQueryWithLimits(t *testing.T) {
-	sql := Q("users").Take(10).Sql()
+func TestMySQLQueryWithLimits(t *testing.T) {
+	sql := Q(MySQL, "users").Take(10).Sql()
 	if sql != "SELECT * FROM users LIMIT 10" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users LIMIT 10", sql)
 	}
 
-	sql = Q("users").Skip(20).Sql()
+	sql = Q(MySQL, "users").Skip(20).Sql()
 	if sql != "SELECT * FROM users LIMIT 20,0" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users LIMIT 20,0", sql)
 	}
 
-	sql = Q("users").Skip(20).Take(10).Sql()
+	sql = Q(MySQL, "users").Skip(20).Take(10).Sql()
 	if sql != "SELECT * FROM users LIMIT 20,10" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users LIMIT 20,10", sql)
 	}
 }
 
-func TestQueryJoins(t *testing.T) {
-	sql := Q("users").
+func TestMySQLQueryJoins(t *testing.T) {
+	sql := Q(MySQL, "users").
 		Join("tweets").On("users.id", "tweets.user_id").
 		Sql()
 	if sql != "SELECT * FROM users JOIN tweets ON users.id=tweets.user_id" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users JOIN tweets ON users.id=tweets.user_id", sql)
 	}
 
-	sql = Q("users").Alias("u").
+	sql = Q(MySQL, "users").Alias("u").
 		Join("tweets").Alias("t").On("u.id", "t.user_id").
 		Take(10).
 		Sql()
@@ -167,7 +167,7 @@ func TestQueryJoins(t *testing.T) {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users u JOIN tweets t ON u.id=t.user_id LIMIT 10", sql)
 	}
 
-	sql = Q("users").
+	sql = Q(MySQL, "users").
 		Join("tweets").On("users.id", "tweets.user_id").
 		Join("followers").On("followers.follower_id", "users.user_id").
 		Sql()
@@ -176,8 +176,8 @@ func TestQueryJoins(t *testing.T) {
 	}
 }
 
-func TestInnerJoins(t *testing.T) {
-	sql := Q("users").
+func TestMySQLInnerJoins(t *testing.T) {
+	sql := Q(MySQL, "users").
 		InnerJoin("tweets").On("users.id", "tweets.user_id").
 		Sql()
 	if sql != "SELECT * FROM users INNER JOIN tweets ON users.id=tweets.user_id" {
@@ -185,8 +185,8 @@ func TestInnerJoins(t *testing.T) {
 	}
 }
 
-func TestLeftInnerJoins(t *testing.T) {
-	sql := Q("users").
+func TestMySQLLeftInnerJoins(t *testing.T) {
+	sql := Q(MySQL, "users").
 		LeftInnerJoin("tweets").On("users.id", "tweets.user_id").
 		Sql()
 	if sql != "SELECT * FROM users LEFT INNER JOIN tweets ON users.id=tweets.user_id" {
@@ -194,8 +194,8 @@ func TestLeftInnerJoins(t *testing.T) {
 	}
 }
 
-func TestOuterJoins(t *testing.T) {
-	sql := Q("users").
+func TestMySQLOuterJoins(t *testing.T) {
+	sql := Q(MySQL, "users").
 		OuterJoin("tweets").On("users.id", "tweets.user_id").
 		Sql()
 	if sql != "SELECT * FROM users OUTER JOIN tweets ON users.id=tweets.user_id" {
@@ -203,8 +203,8 @@ func TestOuterJoins(t *testing.T) {
 	}
 }
 
-func TestLeftOuterJoins(t *testing.T) {
-	sql := Q("users").
+func TestMySQLLeftOuterJoins(t *testing.T) {
+	sql := Q(MySQL, "users").
 		LeftOuterJoin("tweets").On("users.id", "tweets.user_id").
 		Sql()
 	if sql != "SELECT * FROM users LEFT OUTER JOIN tweets ON users.id=tweets.user_id" {
@@ -212,8 +212,8 @@ func TestLeftOuterJoins(t *testing.T) {
 	}
 }
 
-func TestComplexQuery(t *testing.T) {
-	sql := Q("users").Alias("u").
+func TestMySQLComplexQuery(t *testing.T) {
+	sql := Q(MySQL, "users").Alias("u").
 		Join("tweets").Alias("t").On("u.id", "t.user_id").
 		Project("u.name", "t.message").
 		Order().Asc("u.name").
@@ -227,8 +227,8 @@ func TestComplexQuery(t *testing.T) {
 	}
 }
 
-func TestQueryEqualColumn(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryEqualColumn(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().EqCol("message", "user").
 		Sql()
 
@@ -238,8 +238,8 @@ func TestQueryEqualColumn(t *testing.T) {
 	}
 }
 
-func TestQueryNotEqualColumn(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryNotEqualColumn(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().NeCol("message", "user").
 		Sql()
 
@@ -249,8 +249,8 @@ func TestQueryNotEqualColumn(t *testing.T) {
 	}
 }
 
-func TestQueryEqual(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryEqual(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().Eq("message", "Google").
 		Sql()
 
@@ -260,8 +260,8 @@ func TestQueryEqual(t *testing.T) {
 	}
 }
 
-func TestQueryEqualWithSafeString(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryEqualWithSafeString(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().Eq("message", SafeSqlString("'don't escape me'")).
 		Sql()
 
@@ -271,8 +271,8 @@ func TestQueryEqualWithSafeString(t *testing.T) {
 	}
 }
 
-func TestQueryNotEqual(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryNotEqual(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().Ne("message", "Google").
 		Sql()
 
@@ -282,8 +282,8 @@ func TestQueryNotEqual(t *testing.T) {
 	}
 }
 
-func TestQueryNotEqualWithSafeString(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryNotEqualWithSafeString(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().Ne("message", SafeSqlString("'don't escape me'")).
 		Sql()
 
@@ -293,8 +293,8 @@ func TestQueryNotEqualWithSafeString(t *testing.T) {
 	}
 }
 
-func TestQueryLike(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryLike(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().Like("message", "%Google%").
 		Sql()
 
@@ -304,8 +304,8 @@ func TestQueryLike(t *testing.T) {
 	}
 }
 
-func TestQueryLikeWithSafeSqlString(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryLikeWithSafeSqlString(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().Like("message", SafeSqlString("'%don't escape me%'")).
 		Sql()
 
@@ -315,8 +315,8 @@ func TestQueryLikeWithSafeSqlString(t *testing.T) {
 	}
 }
 
-func TestQueryNotLike(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryNotLike(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().NotLike("message", "%Google%").
 		Sql()
 
@@ -326,8 +326,8 @@ func TestQueryNotLike(t *testing.T) {
 	}
 }
 
-func TestQueryNotLikeWithSafeSqlString(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryNotLikeWithSafeSqlString(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().NotLike("message", SafeSqlString("'%don't escape me%'")).
 		Sql()
 
@@ -337,8 +337,8 @@ func TestQueryNotLikeWithSafeSqlString(t *testing.T) {
 	}
 }
 
-func TestQueryInClause(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryInClause(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().In("id", 1, 2).
 		Sql()
 
@@ -348,8 +348,8 @@ func TestQueryInClause(t *testing.T) {
 	}
 }
 
-func TestQueryInClauseWithSafeString(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryInClauseWithSafeString(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().In("id", 1, 2, SafeSqlString("Oops")).
 		Sql()
 
@@ -359,8 +359,8 @@ func TestQueryInClauseWithSafeString(t *testing.T) {
 	}
 }
 
-func TestQueryInClauseAsArray(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryInClauseAsArray(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().In("id", []int{1, 2}).
 		Sql()
 
@@ -370,8 +370,8 @@ func TestQueryInClauseAsArray(t *testing.T) {
 	}
 }
 
-func TestQueryNotInClause(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryNotInClause(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().NotIn("id", 1, 2).
 		Sql()
 
@@ -381,8 +381,8 @@ func TestQueryNotInClause(t *testing.T) {
 	}
 }
 
-func TestQueryNotInClauseWithSafeString(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryNotInClauseWithSafeString(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().NotIn("id", 1, 2, SafeSqlString("Ooops")).
 		Sql()
 
@@ -392,8 +392,8 @@ func TestQueryNotInClauseWithSafeString(t *testing.T) {
 	}
 }
 
-func TestQueryNotInClauseAsArray(t *testing.T) {
-	sql := Q("tweets").
+func TestMySQLQueryNotInClauseAsArray(t *testing.T) {
+	sql := Q(MySQL, "tweets").
 		Where().NotIn("id", []int{1, 2}).
 		Sql()
 

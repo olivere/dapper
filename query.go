@@ -12,6 +12,7 @@ type SafeSqlString string
 // Represents a SQL query on a SQL database.
 
 type Query struct {
+	dialect Dialect
 	t       *tableClause
 	columns []string
 	joins   []*joinClause
@@ -20,8 +21,11 @@ type Query struct {
 	orders  []*orderClause
 }
 
-func Q(table string) *Query {
-	q := &Query{}
+func Q(dialect Dialect, table string) *Query {
+	if dialect == nil {
+		dialect = MySQL
+	}
+	q := &Query{dialect: dialect}
 	t := NewTableClause(q, table)
 	q.t = t
 	q.columns = make([]string, 0)
@@ -39,7 +43,7 @@ func (q *Query) Project(columns ...interface{}) *Query {
 	for _, column := range columns {
 		switch t := column.(type) {
 		default:
-			q.columns = append(q.columns, QuoteString(t.(string)))
+			q.columns = append(q.columns, q.dialect.QuoteString(t.(string)))
 		case SafeSqlString:
 			q.columns = append(q.columns, string(t))
 		case *Query:
@@ -205,10 +209,10 @@ func (t *tableClause) Query() *Query {
 
 func (t *tableClause) SubSql() string {
 	var b bytes.Buffer
-	b.WriteString(QuoteString(t.name))
+	b.WriteString(t.q.dialect.QuoteString(t.name))
 	if t.alias != "" {
 		b.WriteString(" ")
-		b.WriteString(QuoteString(t.alias))
+		b.WriteString(t.q.dialect.QuoteString(t.alias))
 	}
 	return b.String()
 }
@@ -401,7 +405,7 @@ func (we whereEqual) SubSql() string {
 	if we.value != nil {
 		switch t := we.value.(type) {
 		default:
-			return fmt.Sprintf("%s%s%s", we.column, "=", Quote(t))
+			return fmt.Sprintf("%s%s%s", we.column, "=", Quote(we.q.dialect, t))
 		case SafeSqlString:
 			return fmt.Sprintf("%s%s%s", we.column, "=", string(t))
 		}
@@ -441,7 +445,7 @@ func (wne whereNotEqual) SubSql() string {
 	if wne.value != nil {
 		switch t := wne.value.(type) {
 		default:
-			return fmt.Sprintf("%s%s%s", wne.column, "<>", Quote(t))
+			return fmt.Sprintf("%s%s%s", wne.column, "<>", Quote(wne.q.dialect, t))
 		case SafeSqlString:
 			return fmt.Sprintf("%s%s%s", wne.column, "<>", string(t))
 		}
@@ -480,7 +484,7 @@ func (w whereLike) Sql() string {
 func (w whereLike) SubSql() string {
 	switch t := w.value.(type) {
 	default:
-		return fmt.Sprintf("%s LIKE %s", w.column, Quote(t))
+		return fmt.Sprintf("%s LIKE %s", w.column, Quote(w.q.dialect, t))
 	case SafeSqlString:
 		return fmt.Sprintf("%s LIKE %s", w.column, string(t))
 	}
@@ -501,7 +505,7 @@ func (w whereNotLike) Sql() string {
 func (w whereNotLike) SubSql() string {
 	switch t := w.value.(type) {
 	default:
-		return fmt.Sprintf("%s NOT LIKE %s", w.column, Quote(t))
+		return fmt.Sprintf("%s NOT LIKE %s", w.column, Quote(w.q.dialect, t))
 	case SafeSqlString:
 		return fmt.Sprintf("%s NOT LIKE %s", w.column, string(t))
 	}
@@ -533,7 +537,7 @@ func (w whereIn) SubSql() string {
 
 				switch t := inv.Index(j).Interface().(type) {
 				default:
-					b.WriteString(Quote(t))
+					b.WriteString(Quote(w.q.dialect, t))
 				case SafeSqlString:
 					b.WriteString(string(t))
 				}
@@ -545,7 +549,7 @@ func (w whereIn) SubSql() string {
 
 			switch t := value.(type) {
 			default:
-				b.WriteString(Quote(t))
+				b.WriteString(Quote(w.q.dialect, t))
 			case SafeSqlString:
 				b.WriteString(string(t))
 			}
@@ -580,7 +584,7 @@ func (w whereNotIn) SubSql() string {
 
 				switch t := inv.Index(j).Interface().(type) {
 				default:
-					b.WriteString(Quote(t))
+					b.WriteString(Quote(w.q.dialect, t))
 				case SafeSqlString:
 					b.WriteString(string(t))
 				}
@@ -592,7 +596,7 @@ func (w whereNotIn) SubSql() string {
 
 			switch t := value.(type) {
 			default:
-				b.WriteString(Quote(t))
+				b.WriteString(Quote(w.q.dialect, t))
 			case SafeSqlString:
 				b.WriteString(string(t))
 			}

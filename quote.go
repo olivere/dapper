@@ -3,24 +3,18 @@ package dapper
 import (
 	"fmt"
 	"reflect"
-	"regexp"
 	"time"
 )
 
-var (
-	reBackslash   = regexp.MustCompile(`(\\)`)
-	reSingleQuote = regexp.MustCompile("'")
-)
-
-func Quote(val interface{}) string {
+func Quote(dialect Dialect, val interface{}) string {
 	switch data := val.(type) {
 	case nil:
 		return "NULL"
 	case string:
-		return fmt.Sprintf("'%s'", QuoteString(data))
+		return fmt.Sprintf("'%s'", dialect.QuoteString(data))
 	case *string:
 		if data != nil {
-			return fmt.Sprintf("'%s'", QuoteString(*data))
+			return fmt.Sprintf("'%s'", dialect.QuoteString(*data))
 		}
 		return "NULL"
 	case int, int16, int32, int64, uint, uint16, uint32, uint64:
@@ -95,19 +89,14 @@ func Quote(val interface{}) string {
 		}
 		return "NULL"
 	case time.Time:
-		return fmt.Sprintf("'%s'", QuoteString(data.Format("2006-01-02 15:04:05")))
+		return fmt.Sprintf("'%s'", dialect.QuoteString(data.Format("2006-01-02 15:04:05")))
 	case *time.Time:
 		if data != nil {
 			t := val.(*time.Time)
-			return fmt.Sprintf("'%s'", QuoteString((*t).Format("2006-01-02 15:04:05")))
+			return fmt.Sprintf("'%s'", dialect.QuoteString((*t).Format("2006-01-02 15:04:05")))
 		}
 		return "NULL"
 	}
 	panic(fmt.Sprintf("SQL quoting for type %s is not supported", reflect.TypeOf(val)))
 	return ""
-}
-
-func QuoteString(s string) string {
-	q := reBackslash.ReplaceAllString(s, "\\\\")
-	return reSingleQuote.ReplaceAllString(q, "\\'")
 }

@@ -53,6 +53,11 @@ func (s *Session) Debug(debug bool) *Session {
 	return s
 }
 
+// Q starts a query in the session's dialect.
+func (s *Session) Q(table string) *Query {
+	return Q(s.dialect, table)
+}
+
 // Find opens up the query interface of a Session.
 // Parameters in sql start with a colon and will be substituted by the
 // corresponding field in the param object. If there are no substitutions,
@@ -151,7 +156,7 @@ func (r *getRequest) Do(result interface{}) error {
 		return ErrNoPrimaryKey
 	}
 
-	sqlQuery := Q(tableName).Where().Eq(pkCol.ColumnName, r.pk).Sql()
+	sqlQuery := r.s.Q(tableName).Where().Eq(pkCol.ColumnName, r.pk).Sql()
 
 	if r.debug {
 		log.Println(sqlQuery)
@@ -251,7 +256,7 @@ func (q *finder) Single(result interface{}) error {
 			// Get value of field in param
 			field := paramValue.FieldByName(paramName)
 			value := field.Interface()
-			quoted := Quote(value)
+			quoted := Quote(q.session.dialect, value)
 			sqlQuery = strings.Replace(sqlQuery, ":"+paramName, quoted, -1)
 		}
 	}
@@ -362,7 +367,7 @@ func (q *finder) All(result interface{}) error {
 			// Get value of field in param
 			field := paramValue.FieldByName(paramName)
 			value := field.Interface()
-			quoted := Quote(value)
+			quoted := Quote(q.session.dialect, value)
 			sqlQuery = strings.Replace(sqlQuery, ":"+paramName, quoted, -1)
 		}
 	}
@@ -483,7 +488,7 @@ func (q *finder) All(result interface{}) error {
 				idQ, found := oneToOneQueries[assocTableName]
 				if !found {
 					idQ = QueryByIds{
-						Query:      Q(assocTableName),
+						Query:      q.session.Q(assocTableName),
 						IdMap:      make(map[interface{}]bool),
 						Ids:        make([]interface{}, 0),
 						ColumnName: assocColumnName,
@@ -522,7 +527,7 @@ func (q *finder) All(result interface{}) error {
 				idQ, found := oneToManyQueries[assocTableName]
 				if !found {
 					idQ = QueryByIds{
-						Query:      Q(assocTableName),
+						Query:      q.session.Q(assocTableName),
 						IdMap:      make(map[interface{}]bool),
 						Ids:        make([]interface{}, 0),
 						ColumnName: assocColumnName,
@@ -655,7 +660,7 @@ func (q *finder) Scalar(result interface{}) error {
 			// Get value of field in param
 			field := paramValue.FieldByName(paramName)
 			value := field.Interface()
-			quoted := Quote(value)
+			quoted := Quote(q.session.dialect, value)
 			sqlQuery = strings.Replace(sqlQuery, ":"+paramName, quoted, -1)
 		}
 	}
@@ -799,7 +804,7 @@ func (s *Session) generateInsertSql(ti *typeInfo, entity interface{}) (string, e
 
 				field := entityv.Elem().FieldByName(fi.FieldName)
 				value := field.Interface()
-				quoted := Quote(value)
+				quoted := Quote(s.dialect, value)
 				cvals = append(cvals, quoted)
 			} else if fi.IsAutoIncrement {
 				autoIncrField = fi
@@ -901,7 +906,7 @@ func (s *Session) generateUpdateSql(ti *typeInfo, entity interface{}) (string, e
 			if !fi.IsPrimaryKey || fi.IsTransient {
 				field = entityv.FieldByName(fi.FieldName)
 				value := field.Interface()
-				quoted := Quote(value)
+				quoted := Quote(s.dialect, value)
 				pair := fmt.Sprintf("%s=%s", s.dialect.EscapeColumnName(cname), quoted)
 				pairs = append(pairs, pair)
 			}
@@ -912,7 +917,7 @@ func (s *Session) generateUpdateSql(ti *typeInfo, entity interface{}) (string, e
 		s.dialect.EscapeTableName(ti.TableName),
 		strings.Join(pairs, ", "),
 		s.dialect.EscapeColumnName(pk.ColumnName),
-		Quote(pkval)), nil
+		Quote(s.dialect, pkval)), nil
 }
 
 // ---- Delete --------------------------------------------------------------
@@ -990,7 +995,7 @@ func (s *Session) generateDeleteSql(ti *typeInfo, entity interface{}) (string, e
 	return fmt.Sprintf("DELETE FROM %s WHERE %s=%s",
 		s.dialect.EscapeTableName(ti.TableName),
 		s.dialect.EscapeColumnName(pk.ColumnName),
-		Quote(pkval)), nil
+		Quote(s.dialect, pkval)), nil
 }
 
 // ---- Load associations ----------------------------------------------------
@@ -1038,7 +1043,7 @@ func (s *Session) loadAssociations(gotype reflect.Type, resultInfo *typeInfo, re
 		fkTableName := assocTableName
 		fkColName := assocColumnName
 
-		subQuery := Q(fkTableName).Where().Eq(fkColName, fk).Sql()
+		subQuery := s.Q(fkTableName).Where().Eq(fkColName, fk).Sql()
 
 		result := reflect.New(targetField.Type().Elem())
 		targetField.Set(result)
@@ -1072,7 +1077,7 @@ func (s *Session) loadAssociations(gotype reflect.Type, resultInfo *typeInfo, re
 		// Load oneToMany association
 		fkTableName := assocTableName
 		fkColName := assocColumnName
-		subQuery := Q(fkTableName).Where().Eq(fkColName, primaryKey).Sql()
+		subQuery := s.Q(fkTableName).Where().Eq(fkColName, primaryKey).Sql()
 
 		subResults := targetField.Addr().Interface()
 		err = s.Find(subQuery, nil).Debug(s.debug).All(subResults)

@@ -2,10 +2,12 @@ package dapper
 
 import (
 	"fmt"
+	"regexp"
 )
 
 // Dialect represents SQL engine specific information.
 type Dialect interface {
+	QuoteString(string) string
 	EscapeTableName(string) string
 	EscapeColumnName(string) string
 	SupportsLastInsertId() bool
@@ -13,12 +15,22 @@ type Dialect interface {
 	InsertMigrationTableVersionSQL(string) string
 }
 
+var (
+	reBackslash   = regexp.MustCompile(`(\\)`)
+	reSingleQuote = regexp.MustCompile("'")
+)
+
 // -- MySQL --
 
 type MySQLDialect struct{}
 
 func (mysql *MySQLDialect) String() string {
 	return "MySQLDialect"
+}
+
+func (mysql *MySQLDialect) QuoteString(s string) string {
+	q := reBackslash.ReplaceAllString(s, "\\\\")
+	return reSingleQuote.ReplaceAllString(q, "\\'")
 }
 
 func (mysql *MySQLDialect) EscapeTableName(tableName string) string {
@@ -56,6 +68,11 @@ func (sqlite3 *Sqlite3Dialect) String() string {
 	return "Sqlite3Dialect"
 }
 
+func (sqlite3 *Sqlite3Dialect) QuoteString(s string) string {
+	q := reBackslash.ReplaceAllString(s, "\\\\")
+	return reSingleQuote.ReplaceAllString(q, "''")
+}
+
 func (sqlite3 *Sqlite3Dialect) EscapeTableName(tableName string) string {
 	return fmt.Sprintf("`%s`", tableName)
 }
@@ -88,6 +105,11 @@ type PostgreSQLDialect struct{}
 
 func (psql *PostgreSQLDialect) String() string {
 	return "PostgreSQLDialect"
+}
+
+func (psql *PostgreSQLDialect) QuoteString(s string) string {
+	q := reBackslash.ReplaceAllString(s, "\\\\")
+	return reSingleQuote.ReplaceAllString(q, "\\'")
 }
 
 func (psql *PostgreSQLDialect) EscapeTableName(tableName string) string {
