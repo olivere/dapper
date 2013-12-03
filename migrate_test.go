@@ -19,7 +19,7 @@ func TestMigrate(t *testing.T) {
 	session := New(db).Dialect(Sqlite3)
 
 	// Perform initial migration
-	err = NewMigrator(db, "./migrate_test_data/step1/").Dialect(Sqlite3).Do()
+	err = NewMigrator(db, Sqlite3, "./migrate_test_data/step1/").Do()
 	if err != nil {
 		t.Fatalf("expected migrations in step 1 to succeed, got: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestMigrate(t *testing.T) {
 	}
 
 	// Upgrade with step 2
-	err = NewMigrator(db, "./migrate_test_data/step2/").Dialect(Sqlite3).Do()
+	err = NewMigrator(db, Sqlite3, "./migrate_test_data/step2/").Do()
 	if err != nil {
 		t.Fatalf("expected migrations in step 2 to succeed, got: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestMigrate(t *testing.T) {
 	}
 
 	// Upgrade with step 3, which should fail and rollback
-	err = NewMigrator(db, "./migrate_test_data/step3/").Dialect(Sqlite3).Do()
+	err = NewMigrator(db, Sqlite3, "./migrate_test_data/step3/").Do()
 	if err == nil {
 		t.Errorf("expected migrations in step 3 to fail, got no error", err)
 	}

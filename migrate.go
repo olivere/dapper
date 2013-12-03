@@ -45,8 +45,8 @@ type migrator struct {
 	out     io.Writer
 }
 
-func NewMigrator(db *sql.DB, path string) *migrator {
-	return &migrator{db: db, path: path, out: os.Stdout}
+func NewMigrator(db *sql.DB, dialect Dialect, path string) *migrator {
+	return &migrator{db: db, dialect: dialect, path: path, out: os.Stdout}
 }
 
 func (m *migrator) Dialect(dialect Dialect) *migrator {
@@ -71,6 +71,11 @@ func (m *migrator) Out(out io.Writer) *migrator {
 
 func (m *migrator) Do() error {
 	m.printf("Reading migrations from %s\n", m.path)
+
+	// Use MySQL as the default dialect
+	if m.dialect == nil {
+		m.dialect = MySQL
+	}
 
 	// Create migration table (unless it already exists)
 	_, err := m.db.Exec(m.dialect.GetCreateMigrationTableSQL(MigrationTableName))
