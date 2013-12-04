@@ -159,8 +159,11 @@ func (q *Query) Sql() string {
 		}
 	}
 	if q.limit != nil {
-		b.WriteString(" ")
-		b.WriteString(q.limit.SubSql())
+		sql := b.String()
+		b.Reset()
+		b.WriteString(q.dialect.GetLimitString(sql, q.limit.skip, q.limit.take))
+		//b.WriteString(" ")
+		//b.WriteString(q.limit.SubSql())
 	}
 	return b.String()
 }
@@ -689,6 +692,7 @@ func (lc *limitClause) Sql() string {
 	return lc.query.Sql()
 }
 
+/*
 func (lc *limitClause) SubSql() string {
 	if lc.take < 0 && lc.skip < 0 {
 		return ""
@@ -706,3 +710,4 @@ func (lc *limitClause) SubSql() string {
 	}
 	return b.String()
 }
+*/

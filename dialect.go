@@ -1,9 +1,12 @@
 package dapper
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
 )
+
+const MaxInt = int(^uint(0) >> 1)
 
 // Dialect represents SQL engine specific information.
 type Dialect interface {
@@ -11,6 +14,7 @@ type Dialect interface {
 	EscapeTableName(string) string
 	EscapeColumnName(string) string
 	SupportsLastInsertId() bool
+	GetLimitString(query string, skip, take int) string
 	GetCreateMigrationTableSQL(string) string
 	InsertMigrationTableVersionSQL(string) string
 }
@@ -43,6 +47,25 @@ func (mysql *MySQLDialect) EscapeColumnName(columnName string) string {
 
 func (mysql *MySQLDialect) SupportsLastInsertId() bool {
 	return true
+}
+
+func (mysql *MySQLDialect) GetLimitString(query string, skip, take int) string {
+	if take < 0 && skip < 0 {
+		return query
+	}
+	var b bytes.Buffer
+	b.WriteString(query)
+	b.WriteString(" LIMIT ")
+	if skip > 0 {
+		b.WriteString(fmt.Sprintf("%d", skip))
+		if take >= 0 {
+			b.WriteString(",")
+			b.WriteString(fmt.Sprintf("%d", take))
+		}
+	} else {
+		b.WriteString(fmt.Sprintf("%d", take))
+	}
+	return b.String()
 }
 
 func (mysql *MySQLDialect) GetCreateMigrationTableSQL(tableName string) string {
@@ -85,6 +108,25 @@ func (sqlite3 *Sqlite3Dialect) SupportsLastInsertId() bool {
 	return true
 }
 
+func (sqlite3 *Sqlite3Dialect) GetLimitString(query string, skip, take int) string {
+	if take < 0 && skip < 0 {
+		return query
+	}
+	var b bytes.Buffer
+	b.WriteString(query)
+	b.WriteString(" LIMIT ")
+	if take > 0 {
+		b.WriteString(fmt.Sprintf("%d", take))
+	} else {
+		// We must have a limit
+		b.WriteString(fmt.Sprintf("%d", MaxInt))
+	}
+	if skip > 0 {
+		b.WriteString(fmt.Sprintf(" OFFSET %d", skip))
+	}
+	return b.String()
+}
+
 func (sqlite3 *Sqlite3Dialect) GetCreateMigrationTableSQL(tableName string) string {
 	return `
 CREATE TABLE IF NOT EXISTS ` + sqlite3.EscapeTableName(tableName) + ` (
@@ -122,6 +164,21 @@ func (psql *PostgreSQLDialect) EscapeColumnName(columnName string) string {
 
 func (psql *PostgreSQLDialect) SupportsLastInsertId() bool {
 	return false
+}
+
+func (psql *PostgreSQLDialect) GetLimitString(query string, skip, take int) string {
+	if take < 0 && skip < 0 {
+		return query
+	}
+	var b bytes.Buffer
+	b.WriteString(query)
+	if take > 0 {
+		b.WriteString(fmt.Sprintf(" LIMIT %d", take))
+	}
+	if skip > 0 {
+		b.WriteString(fmt.Sprintf(" OFFSET %d", skip))
+	}
+	return b.String()
 }
 
 func (psql *PostgreSQLDialect) GetCreateMigrationTableSQL(tableName string) string {
