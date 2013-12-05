@@ -327,6 +327,54 @@ func (wc *whereClause) NeCol(column string, value string) *whereClause {
 	return wc
 }
 
+func (wc *whereClause) Lt(column string, value interface{}) *whereClause {
+	wlt := whereLessThan{wc.q, column, value}
+	wc.nodes = append(wc.nodes, wlt)
+	return wc
+}
+
+func (wc *whereClause) LtCol(column string, value string) *whereClause {
+	wlt := whereLessThanColumn{wc.q, column, value}
+	wc.nodes = append(wc.nodes, wlt)
+	return wc
+}
+
+func (wc *whereClause) Lte(column string, value interface{}) *whereClause {
+	wlte := whereLessThanOrEqual{wc.q, column, value}
+	wc.nodes = append(wc.nodes, wlte)
+	return wc
+}
+
+func (wc *whereClause) LteCol(column string, value string) *whereClause {
+	wlte := whereLessThanOrEqualColumn{wc.q, column, value}
+	wc.nodes = append(wc.nodes, wlte)
+	return wc
+}
+
+func (wc *whereClause) Gt(column string, value interface{}) *whereClause {
+	wgt := whereGreaterThan{wc.q, column, value}
+	wc.nodes = append(wc.nodes, wgt)
+	return wc
+}
+
+func (wc *whereClause) GtCol(column string, value string) *whereClause {
+	wgt := whereGreaterThanColumn{wc.q, column, value}
+	wc.nodes = append(wc.nodes, wgt)
+	return wc
+}
+
+func (wc *whereClause) Gte(column string, value interface{}) *whereClause {
+	wgte := whereGreaterThanOrEqual{wc.q, column, value}
+	wc.nodes = append(wc.nodes, wgte)
+	return wc
+}
+
+func (wc *whereClause) GteCol(column string, value string) *whereClause {
+	wgte := whereGreaterThanOrEqualColumn{wc.q, column, value}
+	wc.nodes = append(wc.nodes, wgte)
+	return wc
+}
+
 func (wc *whereClause) Like(column string, value interface{}) *whereClause {
 	c := whereLike{wc.q, column, value}
 	wc.nodes = append(wc.nodes, c)
@@ -470,6 +518,166 @@ func (w whereNotEqualColumn) Sql() string {
 
 func (w whereNotEqualColumn) SubSql() string {
 	return fmt.Sprintf("%s%s%s", w.column, "<>", w.value)
+}
+
+// A where clause of type "column < value"
+
+type whereLessThan struct {
+	q      *Query
+	column string
+	value  interface{}
+}
+
+func (w whereLessThan) Sql() string {
+	return w.q.Sql()
+}
+
+func (w whereLessThan) SubSql() string {
+	if w.value != nil {
+		switch t := w.value.(type) {
+		default:
+			return fmt.Sprintf("%s%s%s", w.column, "<", Quote(w.q.dialect, t))
+		case SafeSqlString:
+			return fmt.Sprintf("%s%s%s", w.column, "<", string(t))
+		}
+	}
+	return fmt.Sprintf("%s < NULL", w.column)
+}
+
+// A where clause of type "column < value" and value is a column
+
+type whereLessThanColumn struct {
+	q      *Query
+	column string
+	value  string
+}
+
+func (w whereLessThanColumn) Sql() string {
+	return w.q.Sql()
+}
+
+func (w whereLessThanColumn) SubSql() string {
+	return fmt.Sprintf("%s%s%s", w.column, "<", w.value)
+}
+
+// A where clause of type "column <= value"
+
+type whereLessThanOrEqual struct {
+	q      *Query
+	column string
+	value  interface{}
+}
+
+func (w whereLessThanOrEqual) Sql() string {
+	return w.q.Sql()
+}
+
+func (w whereLessThanOrEqual) SubSql() string {
+	if w.value != nil {
+		switch t := w.value.(type) {
+		default:
+			return fmt.Sprintf("%s%s%s", w.column, "<=", Quote(w.q.dialect, t))
+		case SafeSqlString:
+			return fmt.Sprintf("%s%s%s", w.column, "<=", string(t))
+		}
+	}
+	return fmt.Sprintf("%s <= NULL", w.column)
+}
+
+// A where clause of type "column <= value" and value is a column
+
+type whereLessThanOrEqualColumn struct {
+	q      *Query
+	column string
+	value  string
+}
+
+func (w whereLessThanOrEqualColumn) Sql() string {
+	return w.q.Sql()
+}
+
+func (w whereLessThanOrEqualColumn) SubSql() string {
+	return fmt.Sprintf("%s%s%s", w.column, "<=", w.value)
+}
+
+// A where clause of type "column > value"
+
+type whereGreaterThan struct {
+	q      *Query
+	column string
+	value  interface{}
+}
+
+func (w whereGreaterThan) Sql() string {
+	return w.q.Sql()
+}
+
+func (w whereGreaterThan) SubSql() string {
+	if w.value != nil {
+		switch t := w.value.(type) {
+		default:
+			return fmt.Sprintf("%s%s%s", w.column, ">", Quote(w.q.dialect, t))
+		case SafeSqlString:
+			return fmt.Sprintf("%s%s%s", w.column, ">", string(t))
+		}
+	}
+	return fmt.Sprintf("%s > NULL", w.column)
+}
+
+// A where clause of type "column > value" and value is a column
+
+type whereGreaterThanColumn struct {
+	q      *Query
+	column string
+	value  string
+}
+
+func (w whereGreaterThanColumn) Sql() string {
+	return w.q.Sql()
+}
+
+func (w whereGreaterThanColumn) SubSql() string {
+	return fmt.Sprintf("%s%s%s", w.column, ">", w.value)
+}
+
+// A where clause of type "column >= value"
+
+type whereGreaterThanOrEqual struct {
+	q      *Query
+	column string
+	value  interface{}
+}
+
+func (w whereGreaterThanOrEqual) Sql() string {
+	return w.q.Sql()
+}
+
+func (w whereGreaterThanOrEqual) SubSql() string {
+	if w.value != nil {
+		switch t := w.value.(type) {
+		default:
+			return fmt.Sprintf("%s%s%s", w.column, ">=", Quote(w.q.dialect, t))
+		case SafeSqlString:
+			return fmt.Sprintf("%s%s%s", w.column, ">=", string(t))
+		}
+	}
+	return fmt.Sprintf("%s >= NULL", w.column)
+}
+
+// A where clause of type "column >= value" and value is a column
+
+type whereGreaterThanOrEqualColumn struct {
+	q      *Query
+	column string
+	value  string
+}
+
+func (w whereGreaterThanOrEqualColumn) Sql() string {
+	return w.q.Sql()
+}
+
+func (w whereGreaterThanOrEqualColumn) SubSql() string {
+	return fmt.Sprintf("%s%s%s", w.column, ">=", w.value)
 }
 
 // A where clause of type "column LIKE value"

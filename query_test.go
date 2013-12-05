@@ -62,6 +62,26 @@ func TestMySQLSimpleQueries(t *testing.T) {
 	if sql != "SELECT * FROM users WHERE id NOT IN (1,2,3,4)" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id NOT IN (1,2,3,4)", sql)
 	}
+
+	sql = Q(MySQL, "users").Where().Lt("id", 1).Sql()
+	if sql != "SELECT * FROM users WHERE id<1" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id<1", sql)
+	}
+
+	sql = Q(MySQL, "users").Where().Lte("id", 1).Sql()
+	if sql != "SELECT * FROM users WHERE id<=1" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id<=1", sql)
+	}
+
+	sql = Q(MySQL, "users").Where().Gt("id", 1).Sql()
+	if sql != "SELECT * FROM users WHERE id>1" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id>1", sql)
+	}
+
+	sql = Q(MySQL, "users").Where().Gte("id", 1).Sql()
+	if sql != "SELECT * FROM users WHERE id>=1" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id>=1", sql)
+	}
 }
 
 func TestSqlite3SimpleQueries(t *testing.T) {
@@ -119,6 +139,26 @@ func TestSqlite3SimpleQueries(t *testing.T) {
 	if sql != "SELECT * FROM users WHERE id NOT IN (1,2,3,4)" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id NOT IN (1,2,3,4)", sql)
 	}
+
+	sql = Q(Sqlite3, "users").Where().Lt("id", 1).Sql()
+	if sql != "SELECT * FROM users WHERE id<1" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id<1", sql)
+	}
+
+	sql = Q(Sqlite3, "users").Where().Lte("id", 1).Sql()
+	if sql != "SELECT * FROM users WHERE id<=1" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id<=1", sql)
+	}
+
+	sql = Q(Sqlite3, "users").Where().Gt("id", 1).Sql()
+	if sql != "SELECT * FROM users WHERE id>1" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id>1", sql)
+	}
+
+	sql = Q(Sqlite3, "users").Where().Gte("id", 1).Sql()
+	if sql != "SELECT * FROM users WHERE id>=1" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id>=1", sql)
+	}
 }
 
 func TestPostgreSQLSimpleQueries(t *testing.T) {
@@ -175,6 +215,26 @@ func TestPostgreSQLSimpleQueries(t *testing.T) {
 	sql = Q(PostgreSQL, "users").Where().NotIn("id", 1, 2, 3, 4).Sql()
 	if sql != "SELECT * FROM users WHERE id NOT IN (1,2,3,4)" {
 		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id NOT IN (1,2,3,4)", sql)
+	}
+
+	sql = Q(PostgreSQL, "users").Where().Lt("id", 1).Sql()
+	if sql != "SELECT * FROM users WHERE id<1" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id<1", sql)
+	}
+
+	sql = Q(PostgreSQL, "users").Where().Lte("id", 1).Sql()
+	if sql != "SELECT * FROM users WHERE id<=1" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id<=1", sql)
+	}
+
+	sql = Q(PostgreSQL, "users").Where().Gt("id", 1).Sql()
+	if sql != "SELECT * FROM users WHERE id>1" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id>1", sql)
+	}
+
+	sql = Q(PostgreSQL, "users").Where().Gte("id", 1).Sql()
+	if sql != "SELECT * FROM users WHERE id>=1" {
+		t.Errorf("expected %v, got %v", "SELECT * FROM users WHERE id>=1", sql)
 	}
 }
 
@@ -574,6 +634,110 @@ func TestMySQLQueryNotEqualWithSafeString(t *testing.T) {
 		Sql()
 
 	expected := "SELECT * FROM tweets WHERE message<>'don't escape me'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+// -- Query Lt --------------------------------------------------------------
+
+func TestMySQLQueryLessThan(t *testing.T) {
+	sql := Q(MySQL, "tweets").
+		Where().Lt("message", "Google").
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message<'Google'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+// -- Query Lt with SafeSqlString -------------------------------------------
+
+func TestMySQLQueryLessThanWithSafeString(t *testing.T) {
+	sql := Q(MySQL, "tweets").
+		Where().Lt("message", SafeSqlString("'don't escape me'")).
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message<'don't escape me'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+// -- Query Lte --------------------------------------------------------------
+
+func TestMySQLQueryLessOrEqualThan(t *testing.T) {
+	sql := Q(MySQL, "tweets").
+		Where().Lte("message", "Google").
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message<='Google'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+// -- Query Lte with SafeSqlString -------------------------------------------
+
+func TestMySQLQueryLessThanOrEqualWithSafeString(t *testing.T) {
+	sql := Q(MySQL, "tweets").
+		Where().Lte("message", SafeSqlString("'don't escape me'")).
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message<='don't escape me'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+// -- Query Gt --------------------------------------------------------------
+
+func TestMySQLQueryGreaterThan(t *testing.T) {
+	sql := Q(MySQL, "tweets").
+		Where().Gt("message", "Google").
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message>'Google'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+// -- Query Gt with SafeSqlString -------------------------------------------
+
+func TestMySQLQueryGreaterThanWithSafeString(t *testing.T) {
+	sql := Q(MySQL, "tweets").
+		Where().Gt("message", SafeSqlString("'don't escape me'")).
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message>'don't escape me'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+// -- Query Gte --------------------------------------------------------------
+
+func TestMySQLQueryGreaterThanOrEqual(t *testing.T) {
+	sql := Q(MySQL, "tweets").
+		Where().Gte("message", "Google").
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message>='Google'"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
+// -- Query Gte with SafeSqlString -------------------------------------------
+
+func TestMySQLQueryGreaterThanOrEqualWithSafeString(t *testing.T) {
+	sql := Q(MySQL, "tweets").
+		Where().Gte("message", SafeSqlString("'don't escape me'")).
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE message>='don't escape me'"
 	if sql != expected {
 		t.Errorf("expected %v, got %v", expected, sql)
 	}
