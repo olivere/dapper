@@ -128,10 +128,11 @@ func (u *user) Validate() bool {
 }
 
 type Order struct {
-	Id    int64        `dapper:"id,primarykey,autoincrement,table=orders"`
-	RefId string       `dapper:"ref_id"`
-	User  *user        `dapper:"-"`
-	Items []*OrderItem `dapper:"oneToMany=OrderId"`
+	Id         int64             `dapper:"id,primarykey,autoincrement,table=orders"`
+	RefId      string            `dapper:"ref_id"`
+	User       *user             `dapper:"-"`
+	Items      []*OrderItem      `dapper:"oneToMany=OrderId"`
+	Extensions []*OrderExtension `dapper:"oneToMany=OrderId"`
 }
 
 func (o Order) String() string {
@@ -150,6 +151,18 @@ type OrderItem struct {
 func (item OrderItem) String() string {
 	return fmt.Sprintf("<OrderItem{Id:%d,OrderId:%d,Name:%s,Order:%v}>",
 		item.Id, item.OrderId, item.Name, item.Order)
+}
+
+type OrderExtension struct {
+	Id      int64   `dapper:"id,primarykey,autoincrement,table=order_extensions"`
+	OrderId *int64  `dapper:"order_id"` // notice this is a Ptr to an int64!
+	Field   string  `dapper:"name"`
+	Value   *string `dapper:"value"`
+}
+
+func (ext OrderExtension) String() string {
+	return fmt.Sprintf("<OrderExtension{Id:%d,OrderId:%v,Field:%s,Value:%v}>",
+		ext.Id, ext.OrderId, ext.Field, ext.Value)
 }
 
 // -- Setup -----------------------------------------------------------------
@@ -229,6 +242,11 @@ func seed(driver string, t *testing.T, db *sql.DB) *sql.DB {
 	_, err = db.Exec("DROP TABLE IF EXISTS cruddy " + suffix)
 	if err != nil {
 		t.Fatalf("%s: error dropping cruddy table: %v", driver, err)
+	}
+
+	_, err = db.Exec("DROP TABLE IF EXISTS order_extensions " + suffix)
+	if err != nil {
+		t.Fatalf("%s: error dropping order_extensions table: %v", driver, err)
 	}
 
 	_, err = db.Exec("DROP TABLE IF EXISTS order_items " + suffix)
@@ -331,6 +349,18 @@ CREATE TABLE order_items (
 		t.Fatalf("error creating order_items table: %v", err)
 	}
 
+	_, err = db.Exec(`
+CREATE TABLE order_extensions (
+        id ` + pkCol + `,
+        order_id int null,
+        field varchar(100) not null,
+        value text,
+        foreign key (order_id) references orders (id) on delete cascade
+)`)
+	if err != nil {
+		t.Fatalf("error creating order_extensions table: %v", err)
+	}
+
 	// Insert seed data
 	_, err = db.Exec("INSERT INTO users (name,karma,suspended) VALUES ('Oliver', 42.13, 0)")
 	if err != nil {
@@ -382,6 +412,11 @@ CREATE TABLE order_items (
 	_, err = db.Exec("INSERT INTO order_items (id,order_id,name,price,qty) VALUES (4, 2, 'BlackBox', 199.90, 20)")
 	if err != nil {
 		t.Fatalf("error inserting order item: %v", err)
+	}
+
+	_, err = db.Exec("INSERT INTO order_extensions (id,order_id,field,value) VALUES (1, 1, 'VIP', 'Yes')")
+	if err != nil {
+		t.Fatalf("error inserting order extension: %v", err)
 	}
 
 	return db
@@ -531,11 +566,14 @@ func TestTypeCacheOneToMany(t *testing.T) {
 		if len(ti.FieldNames) != 3 {
 			t.Errorf("expected typeInfo to have %d fields, got %d", 3, len(ti.FieldNames))
 		}
-		if len(ti.AssocFieldNames) != 1 {
-			t.Fatalf("expected len(AssocFieldNames) = %d, got %d", 1, len(ti.AssocFieldNames))
+		if len(ti.AssocFieldNames) != 2 {
+			t.Fatalf("expected len(AssocFieldNames) = %d, got %d", 2, len(ti.AssocFieldNames))
 		}
 		if ti.AssocFieldNames[0] != "Items" {
 			t.Fatalf("expected AssocFieldNames[0] = %s, got %s", "Items", ti.AssocFieldNames[0])
+		}
+		if ti.AssocFieldNames[1] != "Extensions" {
+			t.Fatalf("expected AssocFieldNames[1] = %s, got %s", "Extensions", ti.AssocFieldNames[1])
 		}
 
 		assoc, found := ti.OneToManyInfos["Items"]
@@ -561,6 +599,39 @@ func TestTypeCacheOneToMany(t *testing.T) {
 			t.Errorf("expected foreign table name to be %s, got %s", "order_items", tableName)
 		}
 		columnName, err := assoc.GetColumnName()
+		if err != nil {
+			t.Fatalf("expected to find column name for association, got %v", err)
+		}
+		if columnName != "order_id" {
+			t.Errorf("expected foreign column name to be %s, got %s", "order_id", columnName)
+		}
+		if assoc.ForeignKeyField != "OrderId" {
+			t.Errorf("expected foreign key field to be %s, got %s", "OrderId", assoc.ForeignKeyField)
+		}
+
+		assoc, found = ti.OneToManyInfos["Extensions"]
+		if !found {
+			t.Fatalf("expected to find association by name")
+		}
+		if assoc.FieldName != "Extensions" {
+			t.Errorf("expected association field name of %s, got %s", "Extensions", assoc.FieldName)
+		}
+		sliceSample2 := make([]*OrderExtension, 0)
+		var elemSample2 *OrderExtension
+		if assoc.SliceType != reflect.TypeOf(sliceSample2) {
+			t.Errorf("expected association slice type of %s, got %s", reflect.TypeOf(sliceSample2).String(), assoc.SliceType.String())
+		}
+		if assoc.ElemType != reflect.TypeOf(elemSample2) {
+			t.Fatalf("expected association element type of %s, got %s", reflect.TypeOf(elemSample2).String(), assoc.ElemType.String())
+		}
+		tableName, err = assoc.GetTableName()
+		if err != nil {
+			t.Fatalf("expected to find table name for association, got %v", err)
+		}
+		if tableName != "order_extensions" {
+			t.Errorf("expected foreign table name to be %s, got %s", "order_extensions", tableName)
+		}
+		columnName, err = assoc.GetColumnName()
 		if err != nil {
 			t.Fatalf("expected to find column name for association, got %v", err)
 		}
@@ -826,6 +897,40 @@ func TestSingleWithIncludes(t *testing.T) {
 		for _, item := range order.Items {
 			if item.OrderId != order.Id {
 				t.Errorf("expected item.OrderId == order.Id, but %d != %d", item.OrderId, order.Id)
+			}
+		}
+	}
+}
+
+func TestSingleWithIncludeAndPtrNonPtr(t *testing.T) {
+	for _, driver := range drivers {
+		db, session := setupWithSession(driver, t)
+		defer db.Close()
+
+		var order Order
+
+		err := session.
+			Find("select * from orders where id=1", nil).
+			Include("Items", "Extensions").
+			Single(&order)
+		if err != nil {
+			t.Fatalf("error on Query: %v", err)
+		}
+		if order.Id != 1 {
+			t.Errorf("expected order.Id == %d, got %d", 1, order.Id)
+		}
+		if order.Extensions == nil {
+			t.Fatalf("expected order extensions to be != nil")
+		}
+		if len(order.Extensions) != 1 {
+			t.Errorf("expected len(order.Extensions) == %d, got %d", 1, len(order.Extensions))
+		}
+		for _, ext := range order.Extensions {
+			if ext.OrderId == nil {
+				t.Fatalf("expected ext.OrderId != nil")
+			}
+			if *ext.OrderId != order.Id {
+				t.Errorf("expected ext.OrderId == order.Id, but %d != %d", *ext.OrderId, order.Id)
 			}
 		}
 	}
