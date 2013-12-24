@@ -1044,6 +1044,9 @@ func (s *Session) loadAssociations(gotype reflect.Type, resultInfo *typeInfo, re
 
 		// oneToOne=<table>.<column>.<field>
 		fkField := resultValue.Elem().FieldByName(assoc.ForeignKeyField)
+		if !fkField.IsValid() {
+			return fmt.Errorf("dapper: field %s.%s has a oneToOne association with field %s which is invalid", gotype.String(), assoc.FieldName, assoc.ForeignKeyField)
+		}
 		fk := fkField.Interface()
 		fkTableName := assocTableName
 		fkColName := assocColumnName
