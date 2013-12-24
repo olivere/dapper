@@ -47,6 +47,11 @@ func (s *Session) Dialect(dialect Dialect) *Session {
 	return s
 }
 
+// GetDialect returns the dialect used in this session.
+func (s *Session) GetDialect() Dialect {
+	return s.dialect
+}
+
 // Debug enables or disables output of the SQL statements to the logger.
 func (s *Session) Debug(debug bool) *Session {
 	s.debug = debug
