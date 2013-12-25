@@ -156,7 +156,8 @@ func (item OrderItem) String() string {
 type OrderExtension struct {
 	Id      int64   `dapper:"id,primarykey,autoincrement,table=order_extensions"`
 	OrderId *int64  `dapper:"order_id"` // notice this is a Ptr to an int64!
-	Field   string  `dapper:"name"`
+	Order   *Order  `dapper:"oneToOne=OrderId"`
+	Field   string  `dapper:"field"`
 	Value   *string `dapper:"value"`
 }
 
@@ -414,7 +415,7 @@ CREATE TABLE order_extensions (
 		t.Fatalf("error inserting order item: %v", err)
 	}
 
-	_, err = db.Exec("INSERT INTO order_extensions (id,order_id,field,value) VALUES (1, 1, 'VIP', 'Yes')")
+	_, err = db.Exec("INSERT INTO order_extensions (order_id,field,value) VALUES (1, 'VIP', 'Yes')")
 	if err != nil {
 		t.Fatalf("error inserting order extension: %v", err)
 	}
@@ -672,7 +673,6 @@ func TestTypeCacheOneToOne(t *testing.T) {
 		if len(ti.FieldNames) != 5 {
 			t.Errorf("expected typeInfo to have %d fields, got %d", 5, len(ti.FieldNames))
 		}
-
 		if len(ti.AssocFieldNames) != 1 {
 			t.Fatalf("expected len(AssocFieldNames) = %d, got %d", 1, len(ti.AssocFieldNames))
 		}
@@ -698,6 +698,52 @@ func TestTypeCacheOneToOne(t *testing.T) {
 			t.Errorf("expected foreign table name to be %s, got %s", "orders", tableName)
 		}
 		columnName, err := assoc.GetColumnName()
+		if err != nil {
+			t.Fatalf("expected to find column name for association, got %v", err)
+		}
+		if columnName != "id" {
+			t.Errorf("expected foreign column name to be %s, got %s", "id", columnName)
+		}
+		if assoc.ForeignKeyField != "OrderId" {
+			t.Errorf("expected foreign column name to be %s, got %s", "OrderId", assoc.ForeignKeyField)
+		}
+
+		// OrderExtension
+		ti, err = AddType(reflect.TypeOf(OrderExtension{}))
+		if err != nil {
+			t.Errorf("error adding type OrderExtension: %v", err)
+		}
+		if ti == nil {
+			t.Errorf("expected to return typeInfo, got nil")
+		}
+		if len(ti.FieldNames) != 4 {
+			t.Errorf("expected typeInfo to have %d fields, got %d", 4, len(ti.FieldNames))
+		}
+		if len(ti.AssocFieldNames) != 1 {
+			t.Fatalf("expected len(AssocFieldNames) = %d, got %d", 1, len(ti.AssocFieldNames))
+		}
+		if ti.AssocFieldNames[0] != "Order" {
+			t.Fatalf("expected AssocFieldNames[0] = %s, got %s", "Order", ti.AssocFieldNames[0])
+		}
+		assoc, found = ti.OneToOneInfos["Order"]
+		if !found {
+			t.Fatalf("expected to find association by name")
+		}
+		if assoc.FieldName != "Order" {
+			t.Errorf("expected association field name of %s, got %s", "Order", assoc.FieldName)
+		}
+		var sampleOrder *Order
+		if assoc.TargetType != reflect.TypeOf(sampleOrder) {
+			t.Errorf("expected association type of %s, got %s", reflect.TypeOf(sampleOrder).String(), assoc.TargetType.String())
+		}
+		tableName, err = assoc.GetTableName()
+		if err != nil {
+			t.Fatalf("expected to find table name for association, got %v", err)
+		}
+		if tableName != "orders" {
+			t.Errorf("expected foreign table name to be %s, got %s", "orders", tableName)
+		}
+		columnName, err = assoc.GetColumnName()
 		if err != nil {
 			t.Fatalf("expected to find column name for association, got %v", err)
 		}
@@ -1160,6 +1206,103 @@ func TestAllWithOneToOneIncludes(t *testing.T) {
 			if item.OrderId != item.Order.Id {
 				t.Errorf("expected item.OrderId == item.Order.Id, got %d != %d", item.OrderId, item.Order.Id)
 			}
+		}
+	}
+}
+
+func TestAllWithOneToOneIncludesWithNullableForeignKey(t *testing.T) {
+	for _, driver := range drivers {
+		db, session := setupWithSession(driver, t)
+		defer db.Close()
+
+		var extensions []*OrderExtension
+
+		err := session.
+			// Debug(true).
+			Find("select * from order_extensions order by id", nil).
+			Include("Order").
+			All(&extensions)
+		if err != nil {
+			t.Fatalf("%s: error on Query: %v", driver, err)
+		}
+		if len(extensions) != 1 {
+			t.Errorf("%s: expected len(extensions) == %d, got %d", driver, 1, len(extensions))
+		}
+		for _, ext := range extensions {
+			if ext.Order == nil {
+				t.Fatalf("%s: expected ext.Order to be != nil", driver)
+			}
+			if ext.OrderId == nil {
+				t.Fatalf("%s: expected ext.OrderId to be != nil", driver)
+			}
+			if *ext.OrderId != ext.Order.Id {
+				t.Errorf("%s: expected ext.OrderId == ext.Order.Id, got %d != %d", driver, ext.OrderId, ext.Order.Id)
+			}
+		}
+	}
+}
+
+func TestInsertWithOneToOneIncludesAndNullableForeignKey(t *testing.T) {
+	for _, driver := range drivers {
+		db, session := setupWithSession(driver, t)
+		defer db.Close()
+
+		orderId := int64(1)
+		value := "Yes"
+		ext := &OrderExtension{OrderId: &orderId, Field: "Important", Value: &value}
+		err := session.
+			Debug(true).
+			Insert(ext)
+		if err != nil {
+			t.Fatalf("%s: error on Insert: %v", driver, err)
+		}
+
+		// Load
+		var reload OrderExtension
+		err = session.Debug(true).Get(ext.Id).Include("Order").Do(&reload)
+		if err != nil {
+			t.Fatalf("%s: error on reload: %v", driver, err)
+		}
+		if reload.Order == nil {
+			t.Fatalf("%s: expected reload.Order to be != nil", driver)
+		}
+		if reload.OrderId == nil {
+			t.Fatalf("%s: expected reload.OrderId to be != nil", driver)
+		}
+		if *reload.OrderId != 1 {
+			t.Errorf("%s: expected reload.OrderId == 1, got %d", driver, *reload.OrderId)
+		}
+		if (*reload.Order).Id != 1 {
+			t.Errorf("%s: expected reload.Order.Id == 1, got %d", driver, reload.Order.Id)
+		}
+	}
+}
+
+func TestInsertWithOneToOneIncludesAndNilAsForeignKey(t *testing.T) {
+	for _, driver := range drivers {
+		db, session := setupWithSession(driver, t)
+		defer db.Close()
+
+		value := "Yes"
+		ext := &OrderExtension{OrderId: nil, Field: "Important", Value: &value}
+		err := session.
+			Debug(true).
+			Insert(ext)
+		if err != nil {
+			t.Fatalf("%s: error on Insert: %v", driver, err)
+		}
+
+		// Load
+		var reload OrderExtension
+		err = session.Debug(true).Get(ext.Id).Include("Order").Do(&reload)
+		if err != nil {
+			t.Fatalf("%s: error on reload: %v", driver, err)
+		}
+		if reload.Order != nil {
+			t.Fatalf("%s: expected reload.Order to be nil", driver)
+		}
+		if reload.OrderId != nil {
+			t.Fatalf("%s: expected reload.OrderId to be nil", driver)
 		}
 	}
 }

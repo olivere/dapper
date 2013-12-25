@@ -567,7 +567,12 @@ func (q *finder) All(result interface{}) error {
 			for _, parentv := range idQ.Records {
 				parentIdFieldInfo, _ := idQ.TypeInfo.GetPrimaryKey()
 				parentIdField := parentv.Elem().FieldByName(parentIdFieldInfo.FieldName)
-				parentId := parentIdField.Interface()
+				var parentId interface{}
+				if parentIdField.Kind() != reflect.Ptr {
+					parentId = parentIdField.Interface()
+				} else {
+					parentId = parentIdField.Elem().Interface()
+				}
 
 				// Create a slice for the children
 				itemsv := reflect.MakeSlice(reflect.SliceOf(idQ.OneToMany.ElemType), 0, 0) // reflect.SliceOf(idQ.Typ)
@@ -577,7 +582,12 @@ func (q *finder) All(result interface{}) error {
 					childv := childrenv.Elem().Index(k)
 
 					fkInResult := childv.Elem().FieldByName(idQ.OneToMany.ForeignKeyField)
-					fk := fkInResult.Interface()
+					var fk interface{}
+					if fkInResult.Kind() != reflect.Ptr {
+						fk = fkInResult.Interface()
+					} else {
+						fk = fkInResult.Elem().Interface()
+					}
 
 					if parentId == fk {
 						// we have a matching result in the sub-query
@@ -608,11 +618,21 @@ func (q *finder) All(result interface{}) error {
 
 				childIdFieldInfo, _ := idQ.TypeInfo.GetPrimaryKey()
 				childIdField := childv.Elem().FieldByName(childIdFieldInfo.FieldName)
-				childId := childIdField.Interface()
+				var childId interface{}
+				if childIdField.Kind() != reflect.Ptr {
+					childId = childIdField.Interface()
+				} else {
+					childId = childIdField.Elem().Interface()
+				}
 
 				for _, parentv := range idQ.Records {
 					parentIdField := parentv.Elem().FieldByName(idQ.OneToOne.ForeignKeyField)
-					parentId := parentIdField.Interface()
+					var parentId interface{}
+					if parentIdField.Kind() != reflect.Ptr {
+						parentId = parentIdField.Interface()
+					} else {
+						parentId = parentIdField.Elem().Interface()
+					}
 
 					if childId == parentId {
 						// Got a match
@@ -1046,6 +1066,10 @@ func (s *Session) loadAssociations(gotype reflect.Type, resultInfo *typeInfo, re
 		fkField := resultValue.Elem().FieldByName(assoc.ForeignKeyField)
 		if !fkField.IsValid() {
 			return fmt.Errorf("dapper: field %s.%s has a oneToOne association with field %s which is invalid", gotype.String(), assoc.FieldName, assoc.ForeignKeyField)
+		}
+		if fkField.Kind() == reflect.Ptr && fkField.IsNil() {
+			// No need to load
+			continue
 		}
 		fk := fkField.Interface()
 		fkTableName := assocTableName
