@@ -819,16 +819,18 @@ func (w whereNotIn) SubSql() string {
 // Order clause
 
 type orderClause struct {
-	q   *Query
-	col string
-	dir string
+	q      *Query
+	col    string
+	dir    string
+	values []interface{}
 }
 
 func NewOrderClause(query *Query) *orderClause {
 	c := &orderClause{
-		q:   query,
-		col: "",
-		dir: "",
+		q:      query,
+		col:    "",
+		dir:    "",
+		values: make([]interface{}, 0),
 	}
 	return c
 }
@@ -842,6 +844,13 @@ func (c *orderClause) Asc(column string) *orderClause {
 func (c *orderClause) Desc(column string) *orderClause {
 	c.col = column
 	c.dir = "DESC"
+	return c
+}
+
+func (c *orderClause) Field(column string, values ...interface{}) *orderClause {
+	c.col = column
+	c.dir = ""
+	c.values = append(c.values, values...)
 	return c
 }
 
@@ -866,7 +875,45 @@ func (c *orderClause) Sql() string {
 }
 
 func (c *orderClause) SubSql() string {
-	return fmt.Sprintf("%s %s", c.col, c.dir)
+	if len(c.values) == 0 {
+		return fmt.Sprintf("%s %s", c.col, c.dir)
+	}
+
+	// Special case for MySQL: Preserve ordering by a field:
+	// Example:  ORDER BY FIELD(f.id, 2, 3, 1);
+	// See also: http://stackoverflow.com/questions/1631723/maintaining-order-in-mysql-in-query
+	var b bytes.Buffer
+	for i, value := range c.values {
+		// The element itself could be an array or a slice
+		inv := reflect.ValueOf(value)
+		if inv.Kind() == reflect.Slice || inv.Kind() == reflect.Array {
+			invlen := inv.Len()
+			for j := 0; j < invlen; j++ {
+				if j > 0 {
+					b.WriteString(",")
+				}
+
+				switch t := inv.Index(j).Interface().(type) {
+				default:
+					b.WriteString(Quote(c.q.dialect, t))
+				case SafeSqlString:
+					b.WriteString(string(t))
+				}
+			}
+		} else {
+			if i > 0 {
+				b.WriteString(",")
+			}
+
+			switch t := value.(type) {
+			default:
+				b.WriteString(Quote(c.q.dialect, t))
+			case SafeSqlString:
+				b.WriteString(string(t))
+			}
+		}
+	}
+	return fmt.Sprintf("FIELD(%s,%s)", c.col, b.String())
 }
 
 // Limit clause

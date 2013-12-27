@@ -834,6 +834,20 @@ func TestMySQLQueryInClauseAsSlice(t *testing.T) {
 	}
 }
 
+// -- Query In that preserves order -----------------------------------------
+
+func TestMySQLQueryInOrderedClause(t *testing.T) {
+	sql := Q(MySQL, "tweets").
+		Where().In("id", 1, 2).
+		Order().Field("id", 1, 2).
+		Sql()
+
+	expected := "SELECT * FROM tweets WHERE id IN (1,2) ORDER BY FIELD(id,1,2)"
+	if sql != expected {
+		t.Errorf("expected %v, got %v", expected, sql)
+	}
+}
+
 // -- Query NotIn -----------------------------------------------------------
 
 func TestMySQLQueryNotInClause(t *testing.T) {
