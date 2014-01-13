@@ -570,7 +570,7 @@ func (q *finder) All(result interface{}) error {
 				var parentId interface{}
 				if parentIdField.Kind() != reflect.Ptr {
 					parentId = parentIdField.Interface()
-				} else {
+				} else if parentIdField.Elem().IsValid() {
 					parentId = parentIdField.Elem().Interface()
 				}
 
@@ -585,7 +585,7 @@ func (q *finder) All(result interface{}) error {
 					var fk interface{}
 					if fkInResult.Kind() != reflect.Ptr {
 						fk = fkInResult.Interface()
-					} else {
+					} else if fkInResult.Elem().IsValid() {
 						fk = fkInResult.Elem().Interface()
 					}
 
@@ -621,7 +621,7 @@ func (q *finder) All(result interface{}) error {
 				var childId interface{}
 				if childIdField.Kind() != reflect.Ptr {
 					childId = childIdField.Interface()
-				} else {
+				} else if childIdField.Elem().IsValid() {
 					childId = childIdField.Elem().Interface()
 				}
 
@@ -630,7 +630,7 @@ func (q *finder) All(result interface{}) error {
 					var parentId interface{}
 					if parentIdField.Kind() != reflect.Ptr {
 						parentId = parentIdField.Interface()
-					} else {
+					} else if parentIdField.Elem().IsValid() {
 						parentId = parentIdField.Elem().Interface()
 					}
 
