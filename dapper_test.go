@@ -837,6 +837,34 @@ func TestSingle(t *testing.T) {
 	}
 }
 
+func TestSingleWithParamPtr(t *testing.T) {
+	for _, driver := range drivers {
+		db, session := setupWithSession(driver, t)
+		defer db.Close()
+
+		in := &user{Id: 1}
+		var out user
+		err := session.Find("select * from users where id=:Id", in).Single(&out)
+		if err != nil {
+			t.Fatalf("error on Single: %v", err)
+		}
+		if out.Id != 1 {
+			t.Errorf("expected user.Id == %d, got %d", 1, out.Id)
+		}
+		if out.Name != "Oliver" {
+			t.Errorf("expected user.Name == %s, got %s", "Oliver", out.Name)
+		}
+		if out.Karma == nil {
+			t.Errorf("expected user.Karma != nil, got %v", out.Karma)
+		} else if *out.Karma != 42.13 {
+			t.Errorf("expected user.Karma == %v, got %v", 42.13, *out.Karma)
+		}
+		if out.Suspended {
+			t.Errorf("expected user.Suspended == %v, got %v", false, out.Suspended)
+		}
+	}
+}
+
 func TestSingleWithoutDataReturnsErrNoRows(t *testing.T) {
 	for _, driver := range drivers {
 		db, session := setupWithSession(driver, t)
@@ -1043,6 +1071,28 @@ func TestAllWithParams(t *testing.T) {
 		}
 	}
 }
+
+func TestAllWithParamsPtr(t *testing.T) {
+	for _, driver := range drivers {
+		db, session := setupWithSession(driver, t)
+		defer db.Close()
+
+		var results []user
+
+		type QueryType struct{ Karma float64 }
+		qbe := &QueryType{Karma: 50.0}
+		err := session.
+			Find("select * from users where karma >= :Karma order by id", qbe).
+			All(&results)
+		if err != nil {
+			t.Fatalf("error on Query: %v", err)
+		}
+		if len(results) != 1 {
+			t.Errorf("expected len(results) == %d, got %d", 1, len(results))
+		}
+	}
+}
+
 func TestAllWithPtrToModel(t *testing.T) {
 	for _, driver := range drivers {
 		db, session := setupWithSession(driver, t)

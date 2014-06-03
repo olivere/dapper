@@ -248,6 +248,9 @@ func (q *finder) Single(result interface{}) error {
 	sqlQuery := q.sqlQuery
 	if q.param != nil {
 		paramValue := reflect.ValueOf(q.param)
+		if paramValue.Kind() == reflect.Ptr {
+			paramValue = paramValue.Elem()
+		}
 		paramInfo, err := AddType(paramValue.Type())
 		if err != nil {
 			return err
@@ -359,6 +362,9 @@ func (q *finder) All(result interface{}) error {
 	sqlQuery := q.sqlQuery
 	if q.param != nil {
 		paramValue := reflect.ValueOf(q.param)
+		if paramValue.Kind() == reflect.Ptr {
+			paramValue = paramValue.Elem()
+		}
 		paramInfo, err := AddType(paramValue.Type())
 		if err != nil {
 			return err
@@ -672,6 +678,9 @@ func (q *finder) Scalar(result interface{}) error {
 	// Get information about param
 	if q.param != nil {
 		paramValue := reflect.ValueOf(q.param)
+		if paramValue.Kind() == reflect.Ptr {
+			paramValue = paramValue.Elem()
+		}
 		paramInfo, err := AddType(paramValue.Type())
 		if err != nil {
 			return err
