@@ -96,7 +96,7 @@ func TestMigrate(t *testing.T) {
 	// Upgrade with step 3, which should fail and rollback
 	err = NewMigrator(db, Sqlite3, "./migrate_test_data/step3/").Do()
 	if err == nil {
-		t.Errorf("expected migrations in step 3 to fail, got no error", err)
+		t.Error("expected migrations in step 3 to fail, got no error")
 	}
 
 	// We should still have 4 tables and 3 schema versions

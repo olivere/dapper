@@ -98,5 +98,4 @@ func Quote(dialect Dialect, val interface{}) string {
 		return "NULL"
 	}
 	panic(fmt.Sprintf("SQL quoting for type %s is not supported", reflect.TypeOf(val)))
-	return ""
 }

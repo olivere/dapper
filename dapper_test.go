@@ -1301,7 +1301,7 @@ func TestInsertWithOneToOneIncludesAndNullableForeignKey(t *testing.T) {
 		value := "Yes"
 		ext := &OrderExtension{OrderId: &orderId, Field: "Important", Value: &value}
 		err := session.
-			Debug(true).
+			// Debug(true).
 			Insert(ext)
 		if err != nil {
 			t.Fatalf("%s: error on Insert: %v", driver, err)
@@ -1309,7 +1309,7 @@ func TestInsertWithOneToOneIncludesAndNullableForeignKey(t *testing.T) {
 
 		// Load
 		var reload OrderExtension
-		err = session.Debug(true).Get(ext.Id).Include("Order").Do(&reload)
+		err = session.Get(ext.Id).Include("Order").Do(&reload)
 		if err != nil {
 			t.Fatalf("%s: error on reload: %v", driver, err)
 		}
@@ -1336,7 +1336,7 @@ func TestInsertWithOneToOneIncludesAndNilAsForeignKey(t *testing.T) {
 		value := "Yes"
 		ext := &OrderExtension{OrderId: nil, Field: "Important", Value: &value}
 		err := session.
-			Debug(true).
+			// Debug(true).
 			Insert(ext)
 		if err != nil {
 			t.Fatalf("%s: error on Insert: %v", driver, err)
@@ -1344,7 +1344,7 @@ func TestInsertWithOneToOneIncludesAndNilAsForeignKey(t *testing.T) {
 
 		// Load
 		var reload OrderExtension
-		err = session.Debug(true).Get(ext.Id).Include("Order").Do(&reload)
+		err = session.Get(ext.Id).Include("Order").Do(&reload)
 		if err != nil {
 			t.Fatalf("%s: error on reload: %v", driver, err)
 		}
