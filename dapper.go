@@ -89,6 +89,7 @@ func (f *finder) Debug(debug bool) *finder {
 // `dapper:"oneToMany=<table_name>.<foreign_key>"` or
 // `dapper:"oneToOne=<table_name>.<foreign_key>"`
 // in the table setup.
+// The <table_name> can be omitted if it is unambigious.
 func (f *finder) Include(associations ...string) *finder {
 	f.includes = append(f.includes, associations...)
 	return f
@@ -444,6 +445,7 @@ func (q *finder) All(result interface{}) error {
 		// Load associations by creating a IN query on the child tables
 		type QueryByIds struct {
 			Query      *Query
+			Includes   []string
 			IdMap      map[interface{}]bool
 			Ids        []interface{}
 			ColumnName string
@@ -460,6 +462,8 @@ func (q *finder) All(result interface{}) error {
 		// the table name, column name, and ids of the entities
 		// to load.
 		for k := 0; k < i; k++ {
+			assocNames, assocNamesNextLevel := split(q.includes, ".")
+
 			// Gather information about a single entity
 			recordv := resultv.Elem().Index(k)
 			ti, err := AddType(recordv.Elem().Type())
@@ -475,7 +479,7 @@ func (q *finder) All(result interface{}) error {
 			primaryKey := recordv.Elem().FieldByName(pk.FieldName).Interface()
 
 			// OneToOne
-			for _, assocName := range q.includes {
+			for _, assocName := range assocNames {
 				assoc, found := ti.OneToOneInfos[assocName]
 				if !found {
 					continue
@@ -500,6 +504,7 @@ func (q *finder) All(result interface{}) error {
 				if !found {
 					idQ = QueryByIds{
 						Query:      q.session.Q(assocTableName),
+						Includes:   assocNamesNextLevel,
 						IdMap:      make(map[interface{}]bool),
 						Ids:        make([]interface{}, 0),
 						ColumnName: assocColumnName,
@@ -518,7 +523,7 @@ func (q *finder) All(result interface{}) error {
 			}
 
 			// OneToMany
-			for _, assocName := range q.includes {
+			for _, assocName := range assocNames {
 				assoc, found := ti.OneToManyInfos[assocName]
 				if !found {
 					continue
@@ -539,6 +544,7 @@ func (q *finder) All(result interface{}) error {
 				if !found {
 					idQ = QueryByIds{
 						Query:      q.session.Q(assocTableName),
+						Includes:   assocNamesNextLevel,
 						IdMap:      make(map[interface{}]bool),
 						Ids:        make([]interface{}, 0),
 						ColumnName: assocColumnName,
@@ -564,7 +570,7 @@ func (q *finder) All(result interface{}) error {
 			// Load all children
 			childrenv := reflect.New(idQ.OneToMany.SliceType)
 			children := childrenv.Interface()
-			err := q.session.Find(query.Sql(), nil).All(children)
+			err := q.session.Find(query.Sql(), nil).Include(idQ.Includes...).All(children)
 			if err != nil {
 				return err
 			}
@@ -613,7 +619,7 @@ func (q *finder) All(result interface{}) error {
 			// results will contain all the child records
 			childrenv := reflect.New(reflect.SliceOf(idQ.OneToOne.TargetType))
 			children := childrenv.Interface()
-			err := q.session.Find(query.Sql(), nil).All(children)
+			err := q.session.Find(query.Sql(), nil).Include(idQ.Includes...).All(children)
 			if err != nil {
 				return err
 			}
@@ -1034,10 +1040,45 @@ func (s *Session) generateDeleteSql(ti *typeInfo, entity interface{}) (string, e
 
 // ---- Load associations ----------------------------------------------------
 
+// split takes a slice and splits it on sep and returns both parts.
+// It makes sure that duplicates on both parts are ignored.
+// Example:
+//     []string{"Order", "Order.Items", "Order.Items.Images"}
+///    => []string{"Order"}, []string{"Items", "Items.Images"}
+func split(includes []string, sep string) ([]string, []string) {
+	current := make([]string, 0)
+	currentDups := make(map[string]bool)
+	remaining := make([]string, 0)
+	remainingDups := make(map[string]bool)
+	if len(includes) == 0 {
+		return current, remaining
+	}
+	for _, include := range includes {
+		str := strings.SplitN(include, sep, 2)
+		if len(str) > 0 {
+			if _, found := currentDups[str[0]]; !found {
+				current = append(current, str[0])
+				currentDups[str[0]] = true
+			}
+		}
+		if len(str) > 1 {
+			if _, found := remainingDups[str[0]]; !found {
+				remaining = append(remaining, str[1])
+				remainingDups[str[1]] = true
+			}
+		}
+	}
+	return current, remaining
+}
+
 func (s *Session) loadAssociations(gotype reflect.Type, resultInfo *typeInfo, resultValue reflect.Value, includes []string) error {
 	if len(includes) == 0 {
 		return nil
 	}
+
+	// Includes can be a dot-separated list of association names.
+	// In such a case, associations are loaded recursively.
+	assocNames, assocNamesNextLevel := split(includes, ".")
 
 	// Get primary key value
 	pk, found := resultInfo.GetPrimaryKey()
@@ -1047,7 +1088,7 @@ func (s *Session) loadAssociations(gotype reflect.Type, resultInfo *typeInfo, re
 	primaryKey := resultValue.Elem().FieldByName(pk.FieldName).Interface()
 
 	// Load 1:1 associations
-	for _, assocName := range includes {
+	for _, assocName := range assocNames {
 		assoc, found := resultInfo.OneToOneInfos[assocName]
 		if !found {
 			continue
@@ -1088,7 +1129,7 @@ func (s *Session) loadAssociations(gotype reflect.Type, resultInfo *typeInfo, re
 
 		result := reflect.New(targetField.Type().Elem())
 		targetField.Set(result)
-		err = s.Find(subQuery, nil).Single(targetField.Interface())
+		err = s.Find(subQuery, nil).Include(assocNamesNextLevel...).Single(targetField.Interface())
 		if err != nil {
 			return err
 		}
@@ -1096,7 +1137,7 @@ func (s *Session) loadAssociations(gotype reflect.Type, resultInfo *typeInfo, re
 
 	// Load 1:n associations
 	// TODO(oe) slice into batches of limited size?!
-	for _, assocName := range includes {
+	for _, assocName := range assocNames {
 		assoc, found := resultInfo.OneToManyInfos[assocName]
 		if !found {
 			continue
@@ -1121,7 +1162,7 @@ func (s *Session) loadAssociations(gotype reflect.Type, resultInfo *typeInfo, re
 		subQuery := s.Q(fkTableName).Where().Eq(fkColName, primaryKey).Sql()
 
 		subResults := targetField.Addr().Interface()
-		err = s.Find(subQuery, nil).Debug(s.debug).All(subResults)
+		err = s.Find(subQuery, nil).Include(assocNamesNextLevel...).All(subResults)
 		if err != nil {
 			return err
 		}

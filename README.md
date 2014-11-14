@@ -36,8 +36,8 @@ I'd rather do something like this:
         Take(10).
         Sql()
 
-    => SELECT u.name,t.message 
-         FROM users u 
+    => SELECT u.name,t.message
+         FROM users u
          JOIN tweets t ON u.id=t.user_id
         ORDER BY u.name ASC,t.created DESC
         LIMIT 10
@@ -106,7 +106,7 @@ Now you can throw some SQL at Dapper and let it fill your result set:
         fmt.Println(user.Name)
     }
 
-But there's a second way of executing SQL queries. You can use with a 
+But there's a second way of executing SQL queries. You can use with a
 struct that serves as a binding to the query. Here's how:
 
     // A binding with a UserId field in it
@@ -160,7 +160,7 @@ You can also retrieve the first column of the first row by using the
 Scalar function:
 
     // Create a var for the result
-    var name string 
+    var name string
 
     // Stores the user name
     err := session.Find("select name from users where id=1", nil).Scalar(&name)
@@ -190,17 +190,17 @@ Then insert some data:
         Name:    "Steve",
         Country: "DE",
     }
-    
+
     // Now insert
     err := session.Insert(u)
     if err != nil { ... }
 
     // BTW u.Id is now set
- 
+
 Now let's update the user:
 
     u.Name = "Peter"
-    
+
     err := session.Update(u)
     if err != nil { ... }
 
@@ -216,7 +216,7 @@ transaction, use `InsertTx(tx, ...)`, `UpdateTx(tx, ...)`, and
 ## Running tests
 
 To run tests, you need a MySQL database called `dapper_test` and a user
-`dapper` (password: `dapper`) with access.
+`travis` (empty password) with access.
 
 Then run `go test`.
 
@@ -229,7 +229,7 @@ Then run `go test`.
   date/time-types in MySQL and `time.Time` in Golang.
   However, the `DATE` type in MySQL is mapped to `mysql.Date`, and
   Dapper handles that.
-* We are looking forward to support [Julien Schmidt](https://github.com/JulienSchmidt) 
+* We are looking forward to support [Julien Schmidt](https://github.com/JulienSchmidt)
   [Go-SQL-Driver/MySQL](https://github.com/Go-SQL-Driver/MySQL) as well.
   Julien has not yet decided how to handle `time.Time`
   ([see issue #9](https://github.com/Go-SQL-Driver/MySQL/issues/9)).

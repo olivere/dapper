@@ -16,8 +16,8 @@ import (
 
 const (
 	testDBName = "dapper_test"
-	testDBUser = "dapper"
-	testDBPass = "dapper"
+	testDBUser = "travis"
+	testDBPass = ""
 )
 
 var (
@@ -140,17 +140,30 @@ func (o Order) String() string {
 }
 
 type OrderItem struct {
-	Id      int64   `dapper:"id,primarykey,autoincrement,table=order_items"`
-	OrderId int64   `dapper:"order_id"`
-	Order   *Order  `dapper:"oneToOne=OrderId"`
-	Name    string  `dapper:"name"`
-	Price   float64 `dapper:"price"`
-	Qty     float64 `dapper:"qty"`
+	Id      int64             `dapper:"id,primarykey,autoincrement,table=order_items"`
+	OrderId int64             `dapper:"order_id"`
+	Order   *Order            `dapper:"oneToOne=OrderId"`
+	Name    string            `dapper:"name"`
+	Price   float64           `dapper:"price"`
+	Qty     float64           `dapper:"qty"`
+	Images  []*OrderItemImage `dapper:"oneToMany=OrderItemId"`
 }
 
 func (item OrderItem) String() string {
 	return fmt.Sprintf("<OrderItem{Id:%d,OrderId:%d,Name:%s,Order:%v}>",
 		item.Id, item.OrderId, item.Name, item.Order)
+}
+
+type OrderItemImage struct {
+	Id          int64      `dapper:"id,primarykey,autoincrement,table=order_item_images"`
+	OrderItemId int64      `dapper:"order_item_id"`
+	Item        *OrderItem `dapper:"oneToOne=OrderItemId"`
+	Image       string     `dapper:"image"`
+}
+
+func (img OrderItemImage) String() string {
+	return fmt.Sprintf("<OrderItemImage{Id:%d,OrderItemId:%d,Image:%s}>",
+		img.Id, img.OrderItemId, img.Image)
 }
 
 type OrderExtension struct {
@@ -248,6 +261,11 @@ func seed(driver string, t *testing.T, db *sql.DB) *sql.DB {
 	_, err = db.Exec("DROP TABLE IF EXISTS order_extensions " + suffix)
 	if err != nil {
 		t.Fatalf("%s: error dropping order_extensions table: %v", driver, err)
+	}
+
+	_, err = db.Exec("DROP TABLE IF EXISTS order_item_images " + suffix)
+	if err != nil {
+		t.Fatalf("%s: error dropping order_item_images table: %v", driver, err)
 	}
 
 	_, err = db.Exec("DROP TABLE IF EXISTS order_items " + suffix)
@@ -351,6 +369,17 @@ CREATE TABLE order_items (
 	}
 
 	_, err = db.Exec(`
+CREATE TABLE order_item_images (
+        id ` + pkCol + `,
+        order_item_id int not null,
+        image varchar(100) not null,
+        foreign key (order_item_id) references order_items (id) on delete cascade
+)`)
+	if err != nil {
+		t.Fatalf("error creating order_item_images table: %v", err)
+	}
+
+	_, err = db.Exec(`
 CREATE TABLE order_extensions (
         id ` + pkCol + `,
         order_id int null,
@@ -413,6 +442,15 @@ CREATE TABLE order_extensions (
 	_, err = db.Exec("INSERT INTO order_items (id,order_id,name,price,qty) VALUES (4, 2, 'BlackBox', 199.90, 20)")
 	if err != nil {
 		t.Fatalf("error inserting order item: %v", err)
+	}
+
+	_, err = db.Exec("INSERT INTO order_item_images (id,order_item_id,image) VALUES (1, 1, 'macbook_11.png')")
+	if err != nil {
+		t.Fatalf("error inserting order item image: %v", err)
+	}
+	_, err = db.Exec("INSERT INTO order_item_images (id,order_item_id,image) VALUES (2, 1, 'macbook_11_big.jpg')")
+	if err != nil {
+		t.Fatalf("error inserting order item image: %v", err)
 	}
 
 	_, err = db.Exec("INSERT INTO order_extensions (order_id,field,value) VALUES (1, 'VIP', 'Yes')")
@@ -673,7 +711,7 @@ func TestTypeCacheOneToOne(t *testing.T) {
 		if len(ti.FieldNames) != 5 {
 			t.Errorf("expected typeInfo to have %d fields, got %d", 5, len(ti.FieldNames))
 		}
-		if len(ti.AssocFieldNames) != 1 {
+		if len(ti.AssocFieldNames) != 2 {
 			t.Fatalf("expected len(AssocFieldNames) = %d, got %d", 1, len(ti.AssocFieldNames))
 		}
 		if ti.AssocFieldNames[0] != "Order" {
@@ -706,6 +744,17 @@ func TestTypeCacheOneToOne(t *testing.T) {
 		}
 		if assoc.ForeignKeyField != "OrderId" {
 			t.Errorf("expected foreign column name to be %s, got %s", "OrderId", assoc.ForeignKeyField)
+		}
+
+		if ti.AssocFieldNames[1] != "Images" {
+			t.Fatalf("expected AssocFieldNames[1] = %s, got %s", "Images", ti.AssocFieldNames[1])
+		}
+		assocOneToMany, found := ti.OneToManyInfos["Images"]
+		if !found {
+			t.Fatalf("expected to find association by name")
+		}
+		if assocOneToMany.FieldName != "Images" {
+			t.Errorf("expected association field name of %s, got %s", "Images", assocOneToMany.FieldName)
 		}
 
 		// OrderExtension
@@ -1005,6 +1054,100 @@ func TestSingleWithIncludeAndPtrNonPtr(t *testing.T) {
 			}
 			if *ext.OrderId != order.Id {
 				t.Errorf("expected ext.OrderId == order.Id, but %d != %d", *ext.OrderId, order.Id)
+			}
+		}
+	}
+}
+
+func TestSingleWithIncludeChainsOnOneToOne(t *testing.T) {
+	for _, driver := range drivers {
+		db, session := setupWithSession(driver, t)
+		defer db.Close()
+
+		var order Order
+
+		err := session.
+			Find("select * from orders where id=1", nil).
+			Include("Items", "Items.Order", "Items.Images", "Items.Images.Item").
+			Single(&order)
+		if err != nil {
+			t.Fatalf("error on Query: %v", err)
+		}
+		if order.Id != 1 {
+			t.Errorf("expected order.Id == %d, got %d", 1, order.Id)
+		}
+		if order.Items == nil {
+			t.Fatalf("expected order items to be != nil")
+		}
+		if len(order.Items) != 2 {
+			t.Errorf("expected len(order.Items) == %d, got %d", 2, len(order.Items))
+		}
+		for _, item := range order.Items {
+			if item.OrderId != order.Id {
+				t.Errorf("expected item.OrderId == order.Id, but %d != %d", item.OrderId, order.Id)
+			}
+			if item.Order == nil {
+				t.Fatalf("expected item.Order != nil, got %v", item.Order)
+			}
+			if item.Id == 1 {
+				if item.Images == nil {
+					t.Fatalf("expected order item images to be != nil")
+				}
+				if len(item.Images) != 2 {
+					t.Errorf("expected len(item.Images) == %d, got %d", 2, len(item.Images))
+				}
+				for _, img := range item.Images {
+					if img.OrderItemId != item.Id {
+						t.Errorf("expected img.OrderItemId = %d, got %d", item.Id, img.OrderItemId)
+					}
+					if img.Item == nil {
+						t.Fatalf("expected img.Item != nil, got %v", img.Item)
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestSingleWithIncludeChainsOnOneToMany(t *testing.T) {
+	for _, driver := range drivers {
+		db, session := setupWithSession(driver, t)
+		defer db.Close()
+
+		var order Order
+
+		err := session.
+			Find("select * from orders where id=1", nil).
+			Include("Items", "Items.Images").
+			Single(&order)
+		if err != nil {
+			t.Fatalf("error on Query: %v", err)
+		}
+		if order.Id != 1 {
+			t.Errorf("expected order.Id == %d, got %d", 1, order.Id)
+		}
+		if order.Items == nil {
+			t.Fatalf("expected order items to be != nil")
+		}
+		if len(order.Items) != 2 {
+			t.Errorf("expected len(order.Items) == %d, got %d", 2, len(order.Items))
+		}
+		for _, item := range order.Items {
+			if item.OrderId != order.Id {
+				t.Errorf("expected item.OrderId == order.Id, but %d != %d", item.OrderId, order.Id)
+			}
+			if item.Id == 1 {
+				if item.Images == nil {
+					t.Fatalf("expected order item images to be != nil")
+				}
+				if len(item.Images) != 2 {
+					t.Errorf("expected len(item.Images) == %d, got %d", 2, len(item.Images))
+				}
+				for _, img := range item.Images {
+					if img.OrderItemId != item.Id {
+						t.Errorf("expected img.OrderItemId = %d, got %d", item.Id, img.OrderItemId)
+					}
+				}
 			}
 		}
 	}
