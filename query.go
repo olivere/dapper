@@ -168,6 +168,10 @@ func (q *Query) Sql() string {
 	return b.String()
 }
 
+func (q *Query) String() string {
+	return q.Sql()
+}
+
 // Tables
 
 type tableClause struct {

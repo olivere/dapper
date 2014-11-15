@@ -1170,3 +1170,54 @@ func (s *Session) loadAssociations(gotype reflect.Type, resultInfo *typeInfo, re
 
 	return nil
 }
+
+// ---- Exec --------------------------------------------------------------
+
+// Exec executes an SQL statement and parameters.
+// It can be used in the same sense as sql.Exec, however the statement
+// is logged if debugging is enabled.
+func (s *Session) Exec(query string, args ...interface{}) (sql.Result, error) {
+	if s.debug {
+		log.Printf("%s (%v)", query, args)
+	}
+	return s.db.Exec(query, args...)
+}
+
+// ExecTx executes an SQL statement and parameters in a transaction.
+// It can be used in the same sense as sql.Exec, however the statement
+// is logged if debugging is enabled.
+func (s *Session) ExecTx(tx *sql.Tx, query string, args ...interface{}) (sql.Result, error) {
+	if s.debug {
+		log.Printf("%s (%v)", query, args)
+	}
+	return tx.Exec(query, args...)
+}
+
+// ---- Transactions ------------------------------------------------------
+
+// Begin starts a new transaction and can be used as a placeholder to sql.Begin.
+// However, the statement is logged if debugging is enabled.
+func (s *Session) Begin() (*sql.Tx, error) {
+	if s.debug {
+		log.Println("BEGIN TRANSACTION")
+	}
+	return s.db.Begin()
+}
+
+// Rollback can be used as a placeholder to tx.Rollback.
+// However, the statement is logged if debugging is enabled.
+func (s *Session) Rollback(tx *sql.Tx) error {
+	if s.debug {
+		log.Println("ROLLBACK")
+	}
+	return tx.Rollback()
+}
+
+// Commit can be used as a placeholder to tx.Commit.
+// However, the statement is logged if debugging is enabled.
+func (s *Session) Commit(tx *sql.Tx) error {
+	if s.debug {
+		log.Println("COMMIT")
+	}
+	return tx.Commit()
+}
