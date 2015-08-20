@@ -19,6 +19,7 @@ var (
 	int32_1      = int(1)
 	int64_1      = int(1)
 	uint_1       = int(1)
+	uint8_1      = int(1)
 	uint16_1     = int(1)
 	uint32_1     = int(1)
 	uint64_1     = int(1)
@@ -46,10 +47,12 @@ var quotetests = []QuoteTest{
 	{MySQL, "&int32(1)", &int32_1, "1"},
 	{MySQL, "&int64(1)", &int64_1, "1"},
 	{MySQL, "uint(1)", uint(1), "1"},
+	{MySQL, "uint8(1)", uint8(1), "1"},
 	{MySQL, "uint16(1)", uint16(1), "1"},
 	{MySQL, "uint32(1)", uint32(1), "1"},
 	{MySQL, "uint64(1)", uint64(1), "1"},
 	{MySQL, "&uint(1)", &uint_1, "1"},
+	{MySQL, "&uint8(1)", &uint8_1, "1"},
 	{MySQL, "&uint16(1)", &uint16_1, "1"},
 	{MySQL, "&uint32(1)", &uint32_1, "1"},
 	{MySQL, "&uint64(1)", &uint64_1, "1"},
@@ -77,10 +80,12 @@ var quotetests = []QuoteTest{
 	{Sqlite3, "&int32(1)", &int32_1, "1"},
 	{Sqlite3, "&int64(1)", &int64_1, "1"},
 	{Sqlite3, "uint(1)", uint(1), "1"},
+	{Sqlite3, "uint8(1)", uint8(1), "1"},
 	{Sqlite3, "uint16(1)", uint16(1), "1"},
 	{Sqlite3, "uint32(1)", uint32(1), "1"},
 	{Sqlite3, "uint64(1)", uint64(1), "1"},
 	{Sqlite3, "&uint(1)", &uint_1, "1"},
+	{Sqlite3, "&uint8(1)", &uint8_1, "1"},
 	{Sqlite3, "&uint16(1)", &uint16_1, "1"},
 	{Sqlite3, "&uint32(1)", &uint32_1, "1"},
 	{Sqlite3, "&uint64(1)", &uint64_1, "1"},
@@ -108,10 +113,12 @@ var quotetests = []QuoteTest{
 	{PostgreSQL, "&int32(1)", &int32_1, "1"},
 	{PostgreSQL, "&int64(1)", &int64_1, "1"},
 	{PostgreSQL, "uint(1)", uint(1), "1"},
+	{PostgreSQL, "uint8(1)", uint8(1), "1"},
 	{PostgreSQL, "uint16(1)", uint16(1), "1"},
 	{PostgreSQL, "uint32(1)", uint32(1), "1"},
 	{PostgreSQL, "uint64(1)", uint64(1), "1"},
 	{PostgreSQL, "&uint(1)", &uint_1, "1"},
+	{PostgreSQL, "&uint8(1)", &uint8_1, "1"},
 	{PostgreSQL, "&uint16(1)", &uint16_1, "1"},
 	{PostgreSQL, "&uint32(1)", &uint32_1, "1"},
 	{PostgreSQL, "&uint64(1)", &uint64_1, "1"},

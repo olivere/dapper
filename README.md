@@ -218,6 +218,9 @@ transaction, use `InsertTx(tx, ...)`, `UpdateTx(tx, ...)`, and
 To run tests, you need a MySQL database called `dapper_test` and a user
 `travis` (empty password) with access.
 
+To run tests on PostgreSQL, you need to create a database `dapper_test` and
+allow access to the user `travis`.
+
 Then run `go test`.
 
 ## Known issues

@@ -17,7 +17,7 @@ func Quote(dialect Dialect, val interface{}) string {
 			return fmt.Sprintf("'%s'", dialect.QuoteString(*data))
 		}
 		return "NULL"
-	case int, int16, int32, int64, uint, uint16, uint32, uint64:
+	case int, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
 		return fmt.Sprintf("%d", data)
 	case *int:
 		if data != nil {
@@ -40,6 +40,12 @@ func Quote(dialect Dialect, val interface{}) string {
 	case *int64:
 		if data != nil {
 			v := val.(*int64)
+			return fmt.Sprintf("%d", *v)
+		}
+		return "NULL"
+	case *uint8:
+		if data != nil {
+			v := val.(*uint8)
 			return fmt.Sprintf("%d", *v)
 		}
 		return "NULL"
