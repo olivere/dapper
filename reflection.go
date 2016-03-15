@@ -6,11 +6,12 @@ import (
 	_ "log"
 	"reflect"
 	"strings"
+	"sync"
 )
 
 var (
-	// Caches information about types
-	typeCache map[reflect.Type]*typeInfo
+	typeCacheMu sync.RWMutex               // guards the typeCache
+	typeCache   map[reflect.Type]*typeInfo // information about types
 )
 
 func init() {
@@ -95,9 +96,12 @@ func AddType(gotype reflect.Type) (*typeInfo, error) {
 	}
 
 	// Find the type in the cache
+	typeCacheMu.RLock()
 	if ti, found := typeCache[gotype]; found {
+		typeCacheMu.RUnlock()
 		return ti, nil
 	}
+	typeCacheMu.RUnlock()
 
 	// Inspect and add to type cache
 	ti := &typeInfo{
@@ -229,7 +233,9 @@ func AddType(gotype reflect.Type) (*typeInfo, error) {
 			ti.OneToManyInfos[oneToMany.FieldName] = oneToMany
 		}
 
+		typeCacheMu.Lock()
 		typeCache[gotype] = ti
+		typeCacheMu.Unlock()
 	}
 
 	return ti, nil
